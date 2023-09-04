@@ -1,9 +1,16 @@
 module KnnOnTrees
 
-using GHMill, Statistics, ProgressBars
+# General
+using DrWatson
+using Statistics, ProgressBars
+using Mill
+using GHMill # treeloss function 
+# dataloading
+using MLDatasets, JSON3, JsonGrinder
 
-include("helper_tools.jl")
-export identify_w
+
+include("dataloading.jl")
+export load_dataset, _to_mill, get_list_of_datasets
 
 include("core.jl")
 export knn, knn_probs, knn_probs_all
