@@ -6,13 +6,18 @@ using Statistics, ProgressBars
 using Mill
 using GHMill # treeloss function 
 # dataloading
-using MLDatasets, JSON3, JsonGrinder
+using MLDatasets, JSON3, JsonGrinder, MLUtils, Random
+# utils 
+using Distributions, DataFrames, StatsBase
 
 
 include("dataloading.jl")
-export load_dataset, _to_mill, get_list_of_datasets
+export load_dataset, _to_mill, get_list_of_datasets, preprocess
 
-include("core.jl")
-export knn, knn_probs, knn_probs_all
+include("knn_core.jl")
+export knn, knn_probs, knn_probs_all, knn_predict_multiclass
 
-end # module knn_treeloss
+include("utils.jl")
+export sample_weights, get_most_occured_class
+
+end # module 

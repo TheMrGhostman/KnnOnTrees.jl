@@ -35,16 +35,18 @@ end
 
 function preprocess(X, y; ratios=(0.6,0.2,0.2), procedure=:clf, seed=666)
     @assert sum(ratios) == 1 && length(ratios) == 3
+    val_tst_ratio = ratios[2] + ratios[3]
     if procedure==:clf
         Random.seed!(seed)
         (X_tr, y_tr), rest = MLUtils.splitobs((X,y); at=ratios[1], shuffle=true)
-        (X_val, y_val), (X_tst, y_tst) = MLUtils.splitobs(rest; at=ratios[2], shuffle=false)
+        (X_val, y_val), (X_tst, y_tst) = MLUtils.splitobs(rest; at=ratios[2]/val_tst_ratio, shuffle=false)
         Random.seed!()
     elseif procedure==:ad
         Random.seed!(seed)
+        @assert unique(y) == 2 "There is multiple classes!! For AD we need only two classes \"0\" and \"1\"."
         # first split clean train/val/test
         (X_tr, y_tr), rest = MLUtils.splitobs((X[y.==0], y[y.==0]); at=ratios[1], shuffle=true)
-        (X_cval, y_cval), (X_ctst, y_ctst) = MLUtils.splitobs(rest; at=ratios[2], shuffle=false)
+        (X_cval, y_cval), (X_ctst, y_ctst) = MLUtils.splitobs(rest; at=ratios[2]/val_tst_ratio, shuffle=false)
         # secondly split anomalous to val/test because they are not needed in train 
         (X_aval, y_aval), (X_atst, y_atst) = MLUtils.splitobs((X[y.==1],y[y.==1]); at=0.5, shuffle=true)
         Random.seed!()

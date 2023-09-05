@@ -39,3 +39,14 @@ function knn_probs_all(pdm::Matrix, labels::Union{Vector, SubArray}) # not optim
     prob_mat = cumsum(lm, dims=1) ./ collect(1:size(pdm, 1))
     return prob_mat
 end
+
+function knn_predict_multiclass(pdm::Matrix, labels::Union{Vector, SubArray})
+    # pdm ~ n x m, where n ~ num samples in train and m ~ num samples in test
+    lm = repeat(labels, size(pdm,2), 1) # label matrix
+    spdm = sortperm(pdm, dims=1)
+
+    lm = lm[spdm]
+    # 
+    predicted = cat([[countunique(lm[1:i,j]) for i=1:size(lm,1)] for j=1:size(lm,2)]..., dims=2)
+    return predicted
+end
