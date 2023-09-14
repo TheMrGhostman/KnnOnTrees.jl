@@ -1,4 +1,4 @@
-function knn(x_train, x_test, W, enc, structure; verbose::Bool=true)
+function knn(x_train, x_test, W::Dict, enc, structure; verbose::Bool=true)
     test_range = (verbose) ? tqdm(1:length(x_test)) : 1:length(x_test)
     train_range = 1:length(x_train)
     dist_matrix = zeros(length(x_train), length(x_test))
@@ -6,20 +6,32 @@ function knn(x_train, x_test, W, enc, structure; verbose::Bool=true)
         kb_test, _ = enc(x_test[tst_idx])
         for tr_idx in train_range
             kb_train, _ = enc(x_train[tr_idx])
-            dist_ = weighted_treeloss(kb_test, kb_train, W, structure, "*"; just_in = true) |> mean
+            dist_ = weighted_tree_distance(kb_test, kb_train, W, structure, "*"; just_in = true) |> mean
+            #weighted_treeloss
             dist_matrix[tr_idx, tst_idx] = dist_
         end
     end
     return dist_matrix
 end
 
-
-function knn(x_train, x_test, W; verbose::Bool=true)
+function knn(x_train, x_test, W::Dict; verbose::Bool=true)
     enc = reflectindecoder(x_train[1]; verbose=false)
     structure = identify_w(enc, Dict(), W; verbose=false)["*"] #TODO fixme W....
     knn(x_train, x_test, W, enc, structure; verbose=verbose)
 end
 
+function knn_tm(x_train, x_test, metrics::Function; verbose::Bool=false)
+    test_range = (verbose) ? tqdm(1:length(x_test)) : 1:length(x_test)
+    train_range = 1:length(x_train)
+    dist_matrix = zeros(length(x_train), length(x_test))
+    for tst_idx in test_range
+        for tr_idx in train_range
+            dist_ = metrics(x_test[tst_idx], x_train[tr_idx])
+            dist_matrix[tr_idx, tst_idx] = dist_
+        end
+    end
+    return dist_matrix
+end
 
 function knn_probs(pdm::Matrix, labels::Vector, k::Int) # not optimal function in any way!!!
     # pdm ~ n x m, where n ~ num samples in train and m ~ num samples in test

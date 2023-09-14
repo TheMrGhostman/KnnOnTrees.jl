@@ -13,7 +13,7 @@ function load_dataset(name; to_mill=true)
     if  name == "mutagenesis"
         data = MLDatasets.Mutagenesis(split=:all);
         X = data.features
-        y = data.targets
+        y = data.targets .+ 1
     else 
         data_string = read(datadir("relational/$(name).json"), String);
         data = JSON3.read(data_string);

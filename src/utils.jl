@@ -6,10 +6,16 @@ function sample_weights(W_init::Dict, distribution::Distribution)
 end
 
 function sample_weights(W_init::Dict, df::DataFrame, index::Int)
-    keys = collect(keys(W_init))
-    W_row = df[index, keys];
-    W = Dict{String, Float32}([key=>W_row[key] for key in keys])
+    keys_ = collect(keys(W_init))
+    W_row = df[index, keys_];
+    W = Dict{String, Float32}([key=>W_row[key] for key in keys_])
     return W
+end
+
+function load_hyperparams(df::DataFrame, index::Int)
+    hp_row = df[index, :];
+    hp = (;(Symbol(key)=>hp_row[key] for key in names(df))...)
+    return hp
 end
 
 function get_most_occured_class(d::Dict)
