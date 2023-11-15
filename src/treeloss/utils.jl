@@ -31,7 +31,7 @@ function Base.getindex(ws::WeightStruct, k::Union{String, Symbol})
     return ws.transform.(ws.values[idx])
 end
 
-
+"""
 function _sample_triplet_indexes(y, balanced::Bool=true)
     anchors = (balanced) ? findall(y .== sample(unique(y))) : range(1,length(y));
     anchor_idx = sample(anchors)
@@ -47,7 +47,7 @@ function SampleTriplets(X, y, batchsize=10, balanced::Bool=true)
     iₐ, iₚ, iₙ = index_matrix[1,:], index_matrix[2,:], index_matrix[3,:]
     return X[iₐ], X[iₚ], X[iₙ]
 end
-
+"""
 
 function zerocardinality(bag)
     if isempty(bag)

@@ -8,7 +8,7 @@ using GHMill # treeloss function
 # dataloading
 using MLDatasets, JSON3, JsonGrinder, MLUtils, Random
 # utils 
-using Distributions, DataFrames, StatsBase
+using Distributions, DataFrames, StatsBase, LinearAlgebra
 # treeloss
 using Flux, Distances, StringDistances, OneHotArrays, Base.Threads
 # stuct
@@ -26,8 +26,8 @@ export knn, knn_tm, knn_probs, knn_probs_all, knn_predict_multiclass
 include("utils.jl")
 export sample_weights, get_most_occured_class, load_hyperparams
 
-include("treeloss/utils.jl")
-export SampleTriplets #zerocardinality, WeightStruct, 
+include("triplet_loss.jl")
+export SampleTriplets, OfflineBatchHardTriplets#, triplet_loss
 
 #include("treeloss/metric.jl")
 #export LeafMetric, ProductMetric, SetMetric, reflectmetric
