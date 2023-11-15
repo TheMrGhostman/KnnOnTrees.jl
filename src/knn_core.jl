@@ -4,7 +4,7 @@ function knn(x_train, x_test, W::Dict, enc, structure; verbose::Bool=true)
     dist_matrix = zeros(length(x_train), length(x_test))
     for tst_idx in test_range
         kb_test, _ = enc(x_test[tst_idx])
-        for tr_idx in train_range
+        Threads.@threads for tr_idx in train_range
             kb_train, _ = enc(x_train[tr_idx])
             dist_ = weighted_tree_distance(kb_test, kb_train, W, structure, "*"; just_in = true) |> mean
             #weighted_treeloss

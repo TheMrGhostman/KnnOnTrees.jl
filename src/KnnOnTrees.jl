@@ -10,7 +10,11 @@ using MLDatasets, JSON3, JsonGrinder, MLUtils, Random
 # utils 
 using Distributions, DataFrames, StatsBase
 # treeloss
-using Flux, Distances, StringDistances
+using Flux, Distances, StringDistances, OneHotArrays, Base.Threads
+# stuct
+using Zygote
+
+using HMillDistance
 
 
 include("dataloading.jl")
@@ -21,6 +25,14 @@ export knn, knn_tm, knn_probs, knn_probs_all, knn_predict_multiclass
 
 include("utils.jl")
 export sample_weights, get_most_occured_class, load_hyperparams
+
+include("treeloss/utils.jl")
+export SampleTriplets #zerocardinality, WeightStruct, 
+
+#include("treeloss/metric.jl")
+#export LeafMetric, ProductMetric, SetMetric, reflectmetric
+
+#include("treeloss/printing.jl")
 
 include("treeloss.jl")
 export weighted_tree_distance
