@@ -93,7 +93,10 @@ for iter ∈ tqdm(1:iters)
         xₐᵥ, xₚᵥ, xₙᵥ = SampleTriplets(val..., length(val[2]), false); # There is sampling too
         v_loss = triplet_loss(metric, xₐᵥ, xₚᵥ, xₙᵥ, α); # Just approximation -> correlates with choices of xₐᵥ, xₚᵥ, xₙᵥ 
         v_acc = triplet_accuracy(metric, xₐᵥ, xₚᵥ, xₙᵥ);
-        Wandb.log(lg, Dict("Training/Loss"=>loss_, "Training/TripletAccuracy"=>acc_,"Validation/Loss"=>v_loss, "Validation/TripletAccuracy"=>v_acc),);
+        par_vec = softplus.(Flux.destructure(metric.inner)[1])'
+        par_vec_dict = Dict("Param/no. $(key)"=>value for (key, value) in enumerate(par_vec))
+        loss_dict = Dict("Training/Loss"=>loss_, "Training/TripletAccuracy"=>acc_,"Validation/Loss"=>v_loss, "Validation/TripletAccuracy"=>v_acc)
+        Wandb.log(lg, merge(loss_dict, par_vec_dict),);
         push!(history["Training/Loss"], loss_)
         push!(history["Training/TripletAccuracy"], acc_)
         push!(history["Validation/Loss"], v_loss)
