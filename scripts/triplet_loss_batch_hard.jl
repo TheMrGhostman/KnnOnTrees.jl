@@ -29,10 +29,14 @@ s = ArgParseSettings()
         arg_type = Int
         help = "unique identifier"
         default = Int(rand(1:1e8)) # test for error
+    "log_pars"
+        arg_type = Int
+        help = "if we want to track progres of parameter updates -> 0/1 ≈ false/true"
+        default = 0
 end
 
 parsed_args = parse_args(ARGS, s)
-@unpack dataset, seed, iters, learning_rate, batch_size, ui = parsed_args
+@unpack dataset, seed, iters, learning_rate, batch_size, ui, log_pars = parsed_args
 # dataset, seed, iters, learning_rate, batch_size, ui = "Mutagenesis", 666, 1000, 1e-2, 10, 111
 
 
@@ -93,10 +97,14 @@ for iter ∈ tqdm(1:iters)
         xₐᵥ, xₚᵥ, xₙᵥ = SampleTriplets(val..., length(val[2]), false); # There is sampling too
         v_loss = triplet_loss(metric, xₐᵥ, xₚᵥ, xₙᵥ, α); # Just approximation -> correlates with choices of xₐᵥ, xₚᵥ, xₙᵥ 
         v_acc = triplet_accuracy(metric, xₐᵥ, xₚᵥ, xₙᵥ);
-        par_vec = softplus.(Flux.destructure(metric.inner)[1])'
-        par_vec_dict = Dict("Param/no. $(key)"=>value for (key, value) in enumerate(par_vec))
         loss_dict = Dict("Training/Loss"=>loss_, "Training/TripletAccuracy"=>acc_,"Validation/Loss"=>v_loss, "Validation/TripletAccuracy"=>v_acc)
-        Wandb.log(lg, merge(loss_dict, par_vec_dict),);
+        if log_pars
+            par_vec = softplus.(Flux.destructure(metric.inner)[1])'
+            par_vec_dict = Dict("Param/no. $(key)"=>value for (key, value) in enumerate(par_vec))
+            Wandb.log(lg, merge(loss_dict, par_vec_dict),);
+        else
+            Wandb.log(lg, loss_dict,);
+        end
         push!(history["Training/Loss"], loss_)
         push!(history["Training/TripletAccuracy"], acc_)
         push!(history["Validation/Loss"], v_loss)
