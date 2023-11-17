@@ -98,7 +98,7 @@ for iter ∈ tqdm(1:iters)
         v_loss = triplet_loss(metric, xₐᵥ, xₚᵥ, xₙᵥ, α); # Just approximation -> correlates with choices of xₐᵥ, xₚᵥ, xₙᵥ 
         v_acc = triplet_accuracy(metric, xₐᵥ, xₚᵥ, xₙᵥ);
         loss_dict = Dict("Training/Loss"=>loss_, "Training/TripletAccuracy"=>acc_,"Validation/Loss"=>v_loss, "Validation/TripletAccuracy"=>v_acc)
-        if log_pars
+        if Bool(log_pars)
             par_vec = softplus.(Flux.destructure(metric.inner)[1])'
             par_vec_dict = Dict("Param/no. $(key)"=>value for (key, value) in enumerate(par_vec))
             Wandb.log(lg, merge(loss_dict, par_vec_dict),);
