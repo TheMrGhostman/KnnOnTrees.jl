@@ -29,10 +29,14 @@ s = ArgParseSettings()
         arg_type = Int
         help = "unique identifier"
         default = Int(rand(1:1e8)) # test for error
+    "log_pars"
+        arg_type = Int
+        help = "if we want to track progres of parameter updates -> 0/1 ≈ false/true"
+        default = 0
 end
 
 parsed_args = parse_args(ARGS, s)
-@unpack dataset, seed, iters, learning_rate, batch_size, ui = parsed_args
+@unpack dataset, seed, iters, learning_rate, batch_size, ui, log_pars = parsed_args
 # dataset, seed, iters, learning_rate, batch_size, ui = "Mutagenesis", 666, 1000, 1e-2, 10, 111
 
 
@@ -47,7 +51,8 @@ lg = WandbLogger(project ="TripletLoss",#"Julia-testing",
                                "dataset" => dataset,
                                "iters" => iters,
                                "seed" => seed,
-                               "ui" => ui))
+                               "ui" => ui,
+                               "log_pars"=>log_pars))
 
 # Use LoggingExtras.jl to log to multiple loggers together
 global_logger(lg)
@@ -59,7 +64,7 @@ train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, see
 
 # Loss function
 #  xₐ, xₚ, xₙ, α ≈ anchor, positive, negative, margin
-triplet_loss(model, xₐ, xₚ, xₙ, α=0) = sum(Flux.mean.(model.(xₐ, xₚ)) .- Flux.mean.(model.(xₐ, xₙ)) .+ α)
+triplet_loss(model, xₐ, xₚ, xₙ, α=0) = mean(Flux.mean.(model.(xₐ, xₚ)) .- Flux.mean.(model.(xₐ, xₙ)) .+ α)
 triplet_accuracy(model, xₐ, xₚ, xₙ) = Flux.mean.(model.(xₐ, xₚ)) .<= Flux.mean.(model.(xₐ, xₙ)) # Not exactly accuracy
 # I assume that possitive and anchor should be closer to each other
 
@@ -86,7 +91,14 @@ for iter ∈ tqdm(1:iters)
         xₐᵥ, xₚᵥ, xₙᵥ = SampleTriplets(val..., length(val[2]), false); # There is sampling too
         v_loss = triplet_loss(metric, xₐᵥ, xₚᵥ, xₙᵥ, 0); # Just approximation -> correlates with choices of xₐᵥ, xₚᵥ, xₙᵥ 
         v_acc = triplet_accuracy(metric, xₐᵥ, xₚᵥ, xₙᵥ) |> Flux.mean;
-        Wandb.log(lg, Dict("Training/Loss"=>loss_, "Training/TripletAccuracy"=>acc_,"Validation/Loss"=>v_loss, "Validation/TripletAccuracy"=>v_acc),);
+        loss_dict = Dict("Training/Loss"=>loss_, "Training/TripletAccuracy"=>acc_,"Validation/Loss"=>v_loss, "Validation/TripletAccuracy"=>v_acc)
+        if Bool(log_pars)
+            par_vec = softplus.(Flux.destructure(metric.inner)[1])'
+            par_vec_dict = Dict("Param/no. $(key)"=>value for (key, value) in enumerate(par_vec))
+            Wandb.log(lg, merge(loss_dict, par_vec_dict),);
+        else
+            Wandb.log(lg, loss_dict,);
+        end
         push!(history["Training/Loss"], loss_)
         push!(history["Training/TripletAccuracy"], acc_)
         push!(history["Validation/Loss"], v_loss)
@@ -96,7 +108,7 @@ for iter ∈ tqdm(1:iters)
         push!(history["Training/Loss"], loss_)
         push!(history["Training/TripletAccuracy"], acc_)
     end
-    (isnan(loss_)) ? break : continue 
+    (isnan(loss_)) ? break : continue
 end
 
 # Finish the run (Logger)

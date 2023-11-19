@@ -51,7 +51,8 @@ lg = WandbLogger(project ="TripletLoss",#"Julia-testing",
                                "dataset" => dataset,
                                "iters" => iters,
                                "seed" => seed,
-                               "ui" => ui))
+                               "ui" => ui,
+                               "log_pars"=>log_pars))
 
 # Use LoggingExtras.jl to log to multiple loggers together
 global_logger(lg)
