@@ -1,4 +1,4 @@
-using ArgParse, DrWatson
+using ArgParse, DrWatson, Base.Threads
 using CSV, BSON, DataFrames, Distributions 
 using Mill, GHMill
 using KnnOnTrees
@@ -19,6 +19,8 @@ end
 parsed_args = parse_args(ARGS, s)
 @unpack dataset, table_idx, seed = parsed_args
 # dataset, seed = "Mutagenesis", 666
+
+println("threads on run: $(nthreads())")
 
 start = time()
 data = load_dataset(dataset; to_mill=true);

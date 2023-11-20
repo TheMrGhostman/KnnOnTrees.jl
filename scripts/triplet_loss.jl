@@ -34,7 +34,6 @@ parsed_args = parse_args(ARGS, s)
 @unpack dataset, seed, iters, learning_rate, batch_size, ui = parsed_args
 # dataset, seed, iters, learning_rate, batch_size, ui = "Mutagenesis", 666, 1000, 1e-2, 10, 111
 
-
 run_name = "TripletLoss-experiment-$(dataset)-seed=$(seed)-ui=$(ui)"
 # Initialize logger
 lg = WandbLogger(project ="TripletLoss",#"Julia-testing",
