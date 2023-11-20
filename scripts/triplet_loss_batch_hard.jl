@@ -104,16 +104,22 @@ for iter ∈ tqdm(1:iters)
     batch_ = randperm(length(train[2]))[1:batch_size]
     xₐ, xₚ, xₙ = OfflineBatchHardTriplets(metric, train[1][batch_], train[2][batch_])#SampleTriplets(train..., batch_size, true);
     # Gradients ≈ Forward + Backward
-    loss_, grad = Flux.withgradient(() -> max_triplet_loss(metric, xₐ, xₚ, xₙ, α), ps);
+    loss_, grad = Flux.withgradient(() -> reg_max_triplet_loss(metric, xₐ, xₚ, xₙ, α, β, γ)), ps);
     # Optimization step
     Flux.update!(opt, ps, grad)
     # Logging training
     acc_ = triplet_accuracy(metric, xₐ, xₚ, xₙ)
     if mod(iter, 20)==0
         xₐᵥ, xₚᵥ, xₙᵥ = SampleTriplets(val..., length(val[2]), false); # There is sampling too
-        v_loss = reg_max_triplet_loss(metric, xₐᵥ, xₚᵥ, xₙᵥ, α, β, γ); # Just approximation -> correlates with choices of xₐᵥ, xₚᵥ, xₙᵥ 
+        v_loss = triplet_loss(metric, xₐᵥ, xₚᵥ, xₙᵥ, α); # Just approximation -> correlates with choices of xₐᵥ, xₚᵥ, xₙᵥ 
         v_acc = triplet_accuracy(metric, xₐᵥ, xₚᵥ, xₙᵥ);
         loss_dict = Dict("Training/Loss"=>loss_, "Training/TripletAccuracy"=>acc_,"Validation/Loss"=>v_loss, "Validation/TripletAccuracy"=>v_acc)
+        if  β !== 0
+            v_reg =  β .* sum(x->sqnorm(x,γ), Flux.params(metric))
+            v_par_norm =  sum(x->sqnorm(x,0), Flux.params(metric))
+            reg_dict = Dict("Validation/Regularization" =>  v_reg, "Validation/ParamNorm"=>v_par_norm)
+            loss_dict = merge(loss_dict, reg_dict)
+        end
         if Bool(log_pars)
             par_vec = softplus.(Flux.destructure(metric.inner)[1])'
             par_vec_dict = Dict("Param/no. $(key)"=>value for (key, value) in enumerate(par_vec))
