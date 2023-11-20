@@ -1,5 +1,5 @@
 using ArgParse, DrWatson, BSON, DataFrames, Random
-using Flux, Zygote, Mill, Statistics, KnnOnTrees
+using Flux, Zygote, Mill, Statistics, KnnOnTrees, LinearAlgebra
 using Wandb, Dates, Logging, ProgressBars
 using HMillDistance
 
@@ -65,7 +65,8 @@ train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, see
 # Loss function
 #  xₐ, xₚ, xₙ, α ≈ anchor, positive, negative, margin
 #triplet_loss(model, xₐ, xₚ, xₙ, α=0) = sum(Flux.mean.(model.(xₐ, xₚ)) .- Flux.mean.(model.(xₐ, xₙ)) .+ α)
-max_triplet_loss(model, xₐ, xₚ, xₙ, α=0) = max(mean( model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α ), 0)
+max_triplet_loss(model, xₐ, xₚ, xₙ, α=0) = max(mean( model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α ), 0) 
+reg_max_triplet_loss(model, xₐ, xₚ, xₙ, α=0, β=0, γ=0) = max(mean( model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α ), 0) + β .* mean(norm.(Flux.params(model)) .- γ)
 triplet_loss(model, xₐ, xₚ, xₙ, α=0) = mean( model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α )
 triplet_accuracy(model, xₐ, xₚ, xₙ) = mean(model.(xₐ, xₚ) .<= model.(xₐ, xₙ)) # Not exactly accuracy
 # I assume that possitive and anchor should be closer to each other
