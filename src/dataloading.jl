@@ -47,6 +47,8 @@ end
 function preprocess(X, y; ratios=(0.6,0.2,0.2), procedure=:clf, seed=666, filter_under=0)
     @assert sum(ratios) == 1 && length(ratios) == 3
 
+    idx = filter_out_classes_under_n_observations(y, filter_under);
+    X, y = X[idx], y[idx];
     val_tst_ratio = ratios[2] + ratios[3]
     if procedure==:clf
         Random.seed!(seed)
