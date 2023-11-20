@@ -156,8 +156,8 @@ for i ∈ 1:10:100
     # for triplet loss
     model = svmtrain(exp.(Γ .* gm_tr), train[2]; kernel=LIBSVM.Kernel.Precomputed, verbose=true);
 
-    y_valid_pr, _ = svmpredict(model, exp.(Γ .* gm_valid));
-    y_test_pr, _ = svmpredict(model, exp.(Γ .* gm_test));
+    y_valid_pr, _ = svmpredict(model, exp.(Γ .* gm_val));
+    y_test_pr, _ = svmpredict(model, exp.(Γ .* gm_tst));
 
     valid_a = mean(y_valid_pr .== val[2])
     test_a = mean(y_test_pr .== test[2])
@@ -166,7 +166,7 @@ end
 
 # KNN
 val_probs = knn_predict_multiclass(gm_val, train[2])
-tst_probs = knn_predict_multiclass(gm_test, train[2])
+tst_probs = knn_predict_multiclass(gm_tst, train[2])
 
 tr_len = length(train[2]);
 accuracy_val = mean(val_probs .== repeat(val[2], 1, tr_len)', dims=2)[:];
