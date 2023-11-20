@@ -44,7 +44,7 @@ s = ArgParseSettings()
     "log_pars"
         arg_type = Int
         help = "if we want to track progres of parameter updates -> 0/1 ≈ false/true"
-        default = 0
+        default = 1 
 end
 
 parsed_args = parse_args(ARGS, s)
@@ -108,7 +108,7 @@ for iter ∈ tqdm(1:iters)
     batch_ = randperm(length(train[2]))[1:batch_size]
     xₐ, xₚ, xₙ = OfflineBatchHardTriplets(metric, train[1][batch_], train[2][batch_])#SampleTriplets(train..., batch_size, true);
     # Gradients ≈ Forward + Backward
-    loss_, grad = Flux.withgradient(() -> reg_max_triplet_loss(metric, xₐ, xₚ, xₙ, α, β, γ)), ps);
+    loss_, grad = Flux.withgradient(() -> reg_max_triplet_loss(metric, xₐ, xₚ, xₙ, α, β, γ), ps);
     # Optimization step
     Flux.update!(opt, ps, grad)
     # Logging training
