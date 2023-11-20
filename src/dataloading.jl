@@ -33,8 +33,20 @@ function _to_mill(x)
 end
 
 
-function preprocess(X, y; ratios=(0.6,0.2,0.2), procedure=:clf, seed=666)
+function filter_out_classes_under_n_observations(y::AbstractVector, n::Int)
+    cm = countmap(y)
+    kv = [(k,cm[k]) for k in keys(cm)]
+    kept_kv = filter(x->x[2]>n, kv)
+    kept_classes = map(x->x[1], kept_kv)
+    kept_obs_idx = map(x->(x[2] in kept_classes) ? x[1] : nothing, enumerate(y))
+    indices = filter(x->x!==nothing, kept_obs_idx)
+    return indices
+end
+
+
+function preprocess(X, y; ratios=(0.6,0.2,0.2), procedure=:clf, seed=666, filter_under=0)
     @assert sum(ratios) == 1 && length(ratios) == 3
+
     val_tst_ratio = ratios[2] + ratios[3]
     if procedure==:clf
         Random.seed!(seed)

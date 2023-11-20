@@ -29,6 +29,10 @@ s = ArgParseSettings()
         arg_type = Float64
         help = "scale for parameter regularization (added to triplet loss)"
         default = 0.0
+    "gamma"
+        arg_type = Float64
+        help = "meen value that regularization is pushed to"
+        default = 0.0
     "ui"
         arg_type = Int
         help = "unique identifier"
@@ -40,7 +44,7 @@ s = ArgParseSettings()
 end
 
 parsed_args = parse_args(ARGS, s)
-@unpack dataset, seed, iters, learning_rate, batch_size, reg, ui, log_pars = parsed_args
+@unpack dataset, seed, iters, learning_rate, batch_size, reg, gamma, ui, log_pars = parsed_args
 # dataset, seed, iters, learning_rate, batch_size, ui = "Mutagenesis", 666, 1000, 1e-2, 10, 111
 
 
@@ -53,6 +57,8 @@ lg = WandbLogger(project ="TripletLoss",#"Julia-testing",
                                "transformation" => "Softplus",
                                "initialization" => "randn",
                                "reg" => reg,
+                               "gamma" => gamma,
+                               "margin"=> 1f0,
                                "dataset" => dataset,
                                "iters" => iters,
                                "seed" => seed,
@@ -88,7 +94,9 @@ opt = ADAM(learning_rate) #opt_state = Flux.setup(ADAM(), metric);
 Random.seed!()
 
 #margin 
-α = 1f0
+α = get_config(lg, "margin")
+β = get_config(lg, "reg")
+γ = get_config(lg, "gamma")
 
 history = Dict("Training/Loss"=>[], "Training/TripletAccuracy"=>[], "Validation/Loss"=>[],"Validation/TripletAccuracy"=>[])
 
@@ -103,7 +111,7 @@ for iter ∈ tqdm(1:iters)
     acc_ = triplet_accuracy(metric, xₐ, xₚ, xₙ)
     if mod(iter, 20)==0
         xₐᵥ, xₚᵥ, xₙᵥ = SampleTriplets(val..., length(val[2]), false); # There is sampling too
-        v_loss = triplet_loss(metric, xₐᵥ, xₚᵥ, xₙᵥ, α); # Just approximation -> correlates with choices of xₐᵥ, xₚᵥ, xₙᵥ 
+        v_loss = reg_max_triplet_loss(metric, xₐᵥ, xₚᵥ, xₙᵥ, α, β, γ); # Just approximation -> correlates with choices of xₐᵥ, xₚᵥ, xₙᵥ 
         v_acc = triplet_accuracy(metric, xₐᵥ, xₚᵥ, xₙᵥ);
         loss_dict = Dict("Training/Loss"=>loss_, "Training/TripletAccuracy"=>acc_,"Validation/Loss"=>v_loss, "Validation/TripletAccuracy"=>v_acc)
         if Bool(log_pars)
