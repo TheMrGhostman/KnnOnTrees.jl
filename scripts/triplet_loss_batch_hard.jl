@@ -25,6 +25,10 @@ s = ArgParseSettings()
         arg_type = Int
         help = "Batch size"
         default = 10
+    "reg"
+        arg_type = Float64
+        help = "scale for parameter regularization (added to triplet loss)"
+        default = 0.0
     "ui"
         arg_type = Int
         help = "unique identifier"
@@ -36,7 +40,7 @@ s = ArgParseSettings()
 end
 
 parsed_args = parse_args(ARGS, s)
-@unpack dataset, seed, iters, learning_rate, batch_size, ui, log_pars = parsed_args
+@unpack dataset, seed, iters, learning_rate, batch_size, reg, ui, log_pars = parsed_args
 # dataset, seed, iters, learning_rate, batch_size, ui = "Mutagenesis", 666, 1000, 1e-2, 10, 111
 
 
@@ -48,6 +52,7 @@ lg = WandbLogger(project ="TripletLoss",#"Julia-testing",
                                "batch_size" => batch_size,
                                "transformation" => "Softplus",
                                "initialization" => "randn",
+                               "reg" => reg,
                                "dataset" => dataset,
                                "iters" => iters,
                                "seed" => seed,
@@ -65,8 +70,9 @@ train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, see
 # Loss function
 #  xₐ, xₚ, xₙ, α ≈ anchor, positive, negative, margin
 #triplet_loss(model, xₐ, xₚ, xₙ, α=0) = sum(Flux.mean.(model.(xₐ, xₚ)) .- Flux.mean.(model.(xₐ, xₙ)) .+ α)
+sqnorm(x,b=0) = sum(y->abs2(y .- b), x)
 max_triplet_loss(model, xₐ, xₚ, xₙ, α=0) = max(mean( model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α ), 0) 
-reg_max_triplet_loss(model, xₐ, xₚ, xₙ, α=0, β=0, γ=0) = max(mean( model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α ), 0) + β .* mean(norm.(Flux.params(model)) .- γ)
+reg_max_triplet_loss(model, xₐ, xₚ, xₙ, α=0, β=0, γ=0) = max(mean( model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α ), 0) + β .* sum(x->sqnorm(x,γ), Flux.params(metric))
 triplet_loss(model, xₐ, xₚ, xₙ, α=0) = mean( model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α )
 triplet_accuracy(model, xₐ, xₚ, xₙ) = mean(model.(xₐ, xₚ) .<= model.(xₐ, xₙ)) # Not exactly accuracy
 # I assume that possitive and anchor should be closer to each other
@@ -122,7 +128,7 @@ end
 # Finish the run (Logger)
 close(lg)
 
-id = (seed=seed, ui=ui)
+id = (seed=seed, ui=ui, reg=reg)
 savef = joinpath(datadir("triplet", dataset, "$(seed)"), "$(run_name).bson");
 results = (
     model=metric, metric=_metric, seed=seed, params=ps, iters=iters, 
