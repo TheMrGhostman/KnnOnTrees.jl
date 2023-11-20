@@ -62,3 +62,16 @@ function knn_predict_multiclass(pdm::Matrix, labels::Union{Vector, SubArray})
     predicted = cat([[countunique(lm[1:i,j]) for i=1:size(lm,1)] for j=1:size(lm,2)]..., dims=2)
     return predicted
 end
+
+
+function gram_matrix(x₁, x₂, metric; verbose=true)
+    js = (verbose) ? tqdm(1:length(x₂)) : 1:length(x₂)
+    is = 1:length(x₁)
+    dist_matrix = zeros(length(x₁), length(x₂))
+    for j in js
+        for  i in is
+            dist_matrix[i, j] = Flux.mean(metric(x₂[j], x₁[i]))
+        end
+    end
+    return dist_matrix
+end
