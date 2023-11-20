@@ -82,7 +82,7 @@ train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, see
 #triplet_loss(model, xₐ, xₚ, xₙ, α=0) = sum(Flux.mean.(model.(xₐ, xₚ)) .- Flux.mean.(model.(xₐ, xₙ)) .+ α)
 sqnorm(x,b=0) = sum(y->abs2(y .- b), x)
 max_triplet_loss(model, xₐ, xₚ, xₙ, α=0) = max(mean( model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α ), 0) 
-reg_max_triplet_loss(model, xₐ, xₚ, xₙ, α=0, β=0, γ=0) = max(mean( model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α ), 0) + β .* sum(x->sqnorm(x,γ), Flux.params(metric))
+reg_max_triplet_loss(model, xₐ, xₚ, xₙ, α=0, β=0, γ=0) = max(mean( model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α ), 0) + β .* sqrt(sum(x->sqnorm(x,γ), Flux.params(metric)))
 triplet_loss(model, xₐ, xₚ, xₙ, α=0) = mean( model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α )
 triplet_accuracy(model, xₐ, xₚ, xₙ) = mean(model.(xₐ, xₚ) .<= model.(xₐ, xₙ)) # Not exactly accuracy
 # I assume that possitive and anchor should be closer to each other
@@ -119,8 +119,8 @@ for iter ∈ tqdm(1:iters)
         v_acc = triplet_accuracy(metric, xₐᵥ, xₚᵥ, xₙᵥ);
         loss_dict = Dict("Training/Loss"=>loss_, "Training/TripletAccuracy"=>acc_,"Validation/Loss"=>v_loss, "Validation/TripletAccuracy"=>v_acc)
         if  β !== 0
-            v_reg =  β .* sum(x->sqnorm(x,γ), Flux.params(metric))
-            v_par_norm =  sum(x->sqnorm(x,0), Flux.params(metric))
+            v_reg =  β .* sqrt(sum(x->sqnorm(x,γ), Flux.params(metric)))
+            v_par_norm =  sqrt(sum(x->sqnorm(x,0), Flux.params(metric)))
             reg_dict = Dict("Validation/Regularization" =>  v_reg, "Validation/ParamNorm"=>v_par_norm)
             loss_dict = merge(loss_dict, reg_dict)
         end
