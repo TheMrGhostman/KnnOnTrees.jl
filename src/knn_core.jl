@@ -63,7 +63,6 @@ function knn_predict_multiclass(pdm::Matrix, labels::Union{Vector, SubArray})
     return predicted
 end
 
-
 function gram_matrix(x₁, x₂, metric; verbose=true)
     js = (verbose) ? tqdm(1:length(x₂)) : 1:length(x₂)
     is = 1:length(x₁)
