@@ -33,6 +33,10 @@ s = ArgParseSettings()
         arg_type = Float64
         help = "meen value that regularization is pushed to"
         default = 0.0
+    "margin"
+        arg_type = Float64
+        help = "margin value for triplet loss"
+        default = 1.0
     "ui"
         arg_type = Int
         help = "unique identifier"
@@ -44,7 +48,7 @@ s = ArgParseSettings()
 end
 
 parsed_args = parse_args(ARGS, s)
-@unpack dataset, seed, iters, learning_rate, batch_size, reg, gamma, ui, log_pars = parsed_args
+@unpack dataset, seed, iters, learning_rate, batch_size, reg, gamma, margin, ui, log_pars = parsed_args
 # dataset, seed, iters, learning_rate, batch_size, ui = "Mutagenesis", 666, 1000, 1e-2, 10, 111
 
 
@@ -58,7 +62,7 @@ lg = WandbLogger(project ="TripletLoss",#"Julia-testing",
                                "initialization" => "randn",
                                "reg" => reg,
                                "gamma" => gamma,
-                               "margin"=> 1f0,
+                               "margin"=> margin,
                                "dataset" => dataset,
                                "iters" => iters,
                                "seed" => seed,
