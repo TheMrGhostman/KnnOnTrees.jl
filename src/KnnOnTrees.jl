@@ -27,7 +27,7 @@ include("utils.jl")
 export sample_weights, get_most_occured_class, load_hyperparams
 
 include("triplet_loss.jl")
-export SampleTriplets, OfflineBatchHardTriplets#, triplet_loss
+export SampleTriplets, OfflineBatchHardTriplets, TripletCreation#, triplet_loss
 
 #include("treeloss/metric.jl")
 #export LeafMetric, ProductMetric, SetMetric, reflectmetric

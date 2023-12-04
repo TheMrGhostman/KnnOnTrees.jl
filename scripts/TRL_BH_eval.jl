@@ -45,19 +45,24 @@ s = ArgParseSettings()
         arg_type = Int
         help = "if we want to track progres of parameter updates -> 0/1 ≈ false/true"
         default = 1 
+    "triplet_creation"
+        arg_type = String
+        help = "Type of creation of triplets -> (\"batch_hard\", \"balanced\", \"switching\")"
+        dafault="batch_hard"
 end
 
 parsed_args = parse_args(ARGS, s)
-@unpack dataset, seed, iters, learning_rate, batch_size, reg, gamma, margin, ui, log_pars = parsed_args
+@unpack dataset, seed, iters, learning_rate, batch_size, reg, gamma, margin, ui, log_pars, triplet_creation = parsed_args
 # dataset, seed, iters, learning_rate, batch_size, ui = "Mutagenesis", 666, 1000, 1e-2, 10, 111
 
 
-run_name = "TripletLoss-BH-$(dataset)-seed=$(seed)-ui=$(ui)"
+run_name = "TripletLoss-$(dataset)-seed=$(seed)-ui=$(ui)"
 # Initialize logger
 lg = WandbLogger(project ="TripletLoss",#"Julia-testing",
                  name = run_name,
                  config = Dict("learning_rate" => learning_rate,
                                "batch_size" => batch_size,
+                               "triplet_creation" => triplet_creation,
                                "transformation" => "Softplus",
                                "initialization" => "randn",
                                "reg" => reg,
@@ -105,8 +110,8 @@ Random.seed!()
 history = Dict("Training/Loss"=>[], "Training/TripletAccuracy"=>[], "Validation/Loss"=>[],"Validation/TripletAccuracy"=>[])
 
 for iter ∈ tqdm(1:iters)
-    batch_ = randperm(length(train[2]))[1:batch_size]
-    xₐ, xₚ, xₙ = OfflineBatchHardTriplets(metric, train[1][batch_], train[2][batch_])#SampleTriplets(train..., batch_size, true);
+    xₐ, xₚ, xₙ = TripletCreation(triplet_creation, train, batch_size, metric)
+    
     # Gradients ≈ Forward + Backward
     loss_, grad = Flux.withgradient(() -> reg_max_triplet_loss(metric, xₐ, xₚ, xₙ, α, β, γ), ps);
     # Optimization step
@@ -143,6 +148,7 @@ for iter ∈ tqdm(1:iters)
     (isnan(loss_)) ? break : continue 
 end
 
+close(lg)
 
 #evaluation SVM and KNN
 gm_tr = gram_matrix(train[1], train[1], metric, verbose=false)
@@ -179,11 +185,16 @@ k = argmax(accuracy_tst)
 push!(res, ["KNN", k, accuracy_val[k], accuracy_tst[k]])
 
 
+<<<<<<< Updated upstream
 update_config!(lg, Dict("SVM_gamma" => df_svm_top["Γ/k"], "SVM_valid" => df_svm_top["valid_acc"], "SVM_test"=> df_svm_top["test_acc"], "KNN_k"=>k, "KNN_valid"=>accuracy_val[k], "KNN_test"=>accuracy_tst[k]))
 
 #Wandb.log(lg, Wandb.Table(data=permutedims(hcat(res...),(2,1)), columns=["Model", "Γ/k", "valid_acc", "test_acc"]))
+=======
+df = DataFrame(permutedims(hcat(res...),(2,1)), ["Model", "Γ/k", "valid_acc", "test_acc"])
+#Wandb.log(lg, Wandb.Table(data=res, columns=["Model", "Γ/k", "valid_acc", "test_acc"]))
+>>>>>>> Stashed changes
 # Finish the run (Logger)
-close(lg)
+
 
 df = DataFrame(permutedims(hcat(res...),(2,1)), ["Model", "Γ/k", "valid_acc", "test_acc"])
 
@@ -193,7 +204,11 @@ savef = joinpath(datadir("triplet", dataset, "$(seed)"), "$(run_name).bson");
 results = (
     model=metric, metric=_metric, seed=seed, params=ps, iters=iters, 
     learning_rate=learning_rate, batch_size=batch_size, history=history, 
+<<<<<<< Updated upstream
     train=train, val=val, test=test, ui=id[:ui], res=df, 
+=======
+    train=train, val=val, test=test, ui=id[:ui], res=df,
+>>>>>>> Stashed changes
 )
 
 result = Dict{Symbol, Any}([sym=>val for (sym,val) in pairs(results)]); # this has to be a Dict 

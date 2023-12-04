@@ -36,3 +36,20 @@ function OfflineBatchHardTriplets(model, x, y)
     return xₐ, xₚ, xₙ
 end
 
+# Batching function
+function TripletCreation(type_="balanced", data, batch_size, metric)
+    if type_=="balanced"
+        return SampleTriplets(data[1], data[2], batch_size, true)
+    elseif type_=="batch_hard"
+        batch_ = randperm(length(data[2]))[1:batch_size]
+        return OfflineBatchHardTriplets(metric, data[1][batch_], data[2][batch_])
+    elseif type_=="switching"
+        if rand() < 0.5
+            TripletCreation("balanced", data, batch_size, metric)
+        else
+            TripletCreation("batch_hard", data, batch_size, metric)
+        end
+    else
+        @error "unknown triplet creation"
+    end
+end
