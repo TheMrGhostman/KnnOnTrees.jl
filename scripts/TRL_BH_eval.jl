@@ -179,7 +179,7 @@ accs_plot = Wandb.plot_line_series(svm_matrix[:,1], transpose(svm_matrix[:,2:end
 _,argmax_ = findmax(svm_matrix[:,end])
 
 Wandb.log(lg, Dict("SVM_plot"=>accs_plot, "SVM_tab"=>SVM_results))
-update_config!(lg, Dict("SVM-(γ|t|v|t)" => round.(svm_matrix[argmax_, :], digits=3)))
+update_config!(lg, Dict("SVM-(γ|t|v|t)" => round.(svm_matrix[argmax_, :], digits=3), "SVM-max"=>round(svm_matrix[argmax_, end], digits=4)))
 
 
 # KNN
@@ -198,7 +198,7 @@ KNN_results = Wandb.Table(data=knn_matrix, columns=knn_columns)
 _,argmax_ = findmax(knn_matrix[:,end])
 
 Wandb.log(lg, Dict("KNN_plot"=>accs_plot2, "KNN_tab"=>KNN_results))
-update_config!(lg, Dict("KNN-(k|v|t)" => round.(knn_matrix[argmax_, :], digits=3)))
+update_config!(lg, Dict("KNN-(k|v|t)" => round.(knn_matrix[argmax_, :], digits=3), "KNN-max"=>round(knn_matrix[argmax_, end], digits=4)))
 
 # Finish the run (Logger)
 close(lg)
