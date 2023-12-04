@@ -48,7 +48,7 @@ s = ArgParseSettings()
     "triplet_creation"
         arg_type = String
         help = "Type of creation of triplets -> (\"batch_hard\", \"balanced\", \"switching\")"
-        dafault="batch_hard"
+        default="batch_hard"
 end
 
 parsed_args = parse_args(ARGS, s)
