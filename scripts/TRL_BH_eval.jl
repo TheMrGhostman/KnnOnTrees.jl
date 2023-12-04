@@ -148,55 +148,60 @@ for iter ∈ tqdm(1:iters)
     (isnan(loss_)) ? break : continue 
 end
 
-close(lg)
-
 #evaluation SVM and KNN
-gm_tr = gram_matrix(train[1], train[1], metric, verbose=false)
-gm_val = gram_matrix(train[1], val[1], metric, verbose=false)
-gm_tst = gram_matrix(train[1], test[1], metric, verbose=false)
+gm_tr = gram_matrix(train[1], train[1], metric, verbose=false);
+gm_val = gram_matrix(train[1], val[1], metric, verbose=false);
+gm_tst = gram_matrix(train[1], test[1], metric, verbose=false);
+
+rbfkernel(x, γ) = exp.(-(x .^2) ./ γ)
 
 
 res = []
-res_vals = []
-for i ∈ 1:10:100
-    Γ = 1/i
-    # for triplet loss
-    model = svmtrain(exp.(Γ .* gm_tr), train[2]; kernel=LIBSVM.Kernel.Precomputed, verbose=true);
+for γ ∈ tqdm(0:0.01:2)
+    model = svmtrain(rbfkernel(gm_tr, γ), train[2]; kernel=LIBSVM.Kernel.Precomputed, verbose=false);
 
-    y_valid_pr, _ = svmpredict(model, exp.(Γ .* gm_val));
-    y_test_pr, _ = svmpredict(model, exp.(Γ .* gm_tst));
+    y_train_pr, _ = svmpredict(model, rbfkernel(gm_tr, γ));
+    y_valid_pr, _ = svmpredict(model, rbfkernel(gm_val, γ));
+    y_test_pr, _ = svmpredict(model, rbfkernel(gm_tst, γ));
 
+    train_a = mean(y_train_pr .== train[2])
     valid_a = mean(y_valid_pr .== val[2])
     test_a = mean(y_test_pr .== test[2])
-    push!(res, ["SVM", Γ, valid_a, test_a])
+
+    push!(res, [γ, train_a, valid_a, test_a])
 end
-df_svm = DataFrame(permutedims(hcat(res...),(2,1)), ["Model", "Γ/k", "valid_acc", "test_acc"])
-df_svm_top = sort(df_svm, ["test_acc"], rev=true)[1,:]
+
+## logging
+svm_matrix = permutedims(hcat(res...), (2,1))
+svm_columns = ["γ", "train_acc", "valid_acc", "test_acc"]
+SVM_results = Wandb.Table(data=svm_matrix, columns=svm_columns)
+accs_plot = Wandb.plot_line_series(svm_matrix[:,1], transpose(svm_matrix[:,2:end]), ["train", "valid", "test"], "Accuracy", "γ")
+_,argmax_ = findmax(svm_matrix[:,end])
+
+Wandb.log(lg, Dict("SVM_plot"=>accs_plot, "SVM_tab"=>SVM_results))
+update_config!(lg, Dict("SVM-(γ|t|v|t)" => round.(svm_matrix[argmax_, :], digits=3)))
+
 
 # KNN
-val_probs = knn_predict_multiclass(gm_val, train[2])
-tst_probs = knn_predict_multiclass(gm_tst, train[2])
+val_probs = knn_predict_multiclass(gm_val, train[2]);
+tst_probs = knn_predict_multiclass(gm_tst, train[2]);
 
 tr_len = length(train[2]);
 accuracy_val = mean(val_probs .== repeat(val[2], 1, tr_len)', dims=2)[:];
 accuracy_tst = mean(tst_probs .== repeat(test[2], 1, tr_len)', dims=2)[:];
 
-k = argmax(accuracy_tst)
-push!(res, ["KNN", k, accuracy_val[k], accuracy_tst[k]])
+## logging
+knn_matrix = hcat(1:tr_len, accuracy_val, accuracy_tst)
+knn_columns=["k", "valid_acc", "test_acc"]
+accs_plot2 = Wandb.plot_line_series(collect(1:tr_len), hcat(accuracy_val, accuracy_tst)', ["valid", "test"], "Accuracy", "k")
+KNN_results = Wandb.Table(data=knn_matrix, columns=knn_columns)
+_,argmax_ = findmax(knn_matrix[:,end])
 
+Wandb.log(lg, Dict("KNN_plot"=>accs_plot2, "KNN_tab"=>KNN_results))
+update_config!(lg, Dict("KNN-(k|v|t)" => round.(knn_matrix[argmax_, :], digits=3)))
 
-<<<<<<< Updated upstream
-update_config!(lg, Dict("SVM_gamma" => df_svm_top["Γ/k"], "SVM_valid" => df_svm_top["valid_acc"], "SVM_test"=> df_svm_top["test_acc"], "KNN_k"=>k, "KNN_valid"=>accuracy_val[k], "KNN_test"=>accuracy_tst[k]))
-
-#Wandb.log(lg, Wandb.Table(data=permutedims(hcat(res...),(2,1)), columns=["Model", "Γ/k", "valid_acc", "test_acc"]))
-=======
-df = DataFrame(permutedims(hcat(res...),(2,1)), ["Model", "Γ/k", "valid_acc", "test_acc"])
-#Wandb.log(lg, Wandb.Table(data=res, columns=["Model", "Γ/k", "valid_acc", "test_acc"]))
->>>>>>> Stashed changes
 # Finish the run (Logger)
-
-
-df = DataFrame(permutedims(hcat(res...),(2,1)), ["Model", "Γ/k", "valid_acc", "test_acc"])
+close(lg)
 
 
 id = (seed=seed, ui=ui, reg=reg)
@@ -204,11 +209,10 @@ savef = joinpath(datadir("triplet", dataset, "$(seed)"), "$(run_name).bson");
 results = (
     model=metric, metric=_metric, seed=seed, params=ps, iters=iters, 
     learning_rate=learning_rate, batch_size=batch_size, history=history, 
-<<<<<<< Updated upstream
-    train=train, val=val, test=test, ui=id[:ui], res=df, 
-=======
-    train=train, val=val, test=test, ui=id[:ui], res=df,
->>>>>>> Stashed changes
+    train=train, val=val, test=test, ui=id[:ui], 
+    svm_res = DataFrame(svm_matrix, svm_columns),
+    knn_res = DataFrame(knn_matrix, knn_columns)
+
 )
 
 result = Dict{Symbol, Any}([sym=>val for (sym,val) in pairs(results)]); # this has to be a Dict 
