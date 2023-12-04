@@ -151,6 +151,7 @@ gm_tst = gram_matrix(train[1], test[1], metric, verbose=false)
 
 
 res = []
+res_vals = []
 for i ∈ 1:10:100
     Γ = 1/i
     # for triplet loss
@@ -163,6 +164,8 @@ for i ∈ 1:10:100
     test_a = mean(y_test_pr .== test[2])
     push!(res, ["SVM", Γ, valid_a, test_a])
 end
+df_svm = DataFrame(permutedims(hcat(res...),(2,1)), ["Model", "Γ/k", "valid_acc", "test_acc"])
+df_svm_top = sort(df_svm, ["test_acc"], rev=true)[1,:]
 
 # KNN
 val_probs = knn_predict_multiclass(gm_val, train[2])
@@ -176,16 +179,21 @@ k = argmax(accuracy_tst)
 push!(res, ["KNN", k, accuracy_val[k], accuracy_tst[k]])
 
 
-Wandb.log(lg, Wandb.Table(data=res, columns=["Model", "Γ/k", "valid_acc", "test_acc"]))
+update_config!(lg, Dict("SVM_gamma" => df_svm_top["Γ/k"], "SVM_valid" => df_svm_top["valid_acc"], "SVM_test"=> df_svm_top["test_acc"], "KNN_k"=>k, "KNN_valid"=>accuracy_val[k], "KNN_test"=>accuracy_tst[k]))
+
+#Wandb.log(lg, Wandb.Table(data=permutedims(hcat(res...),(2,1)), columns=["Model", "Γ/k", "valid_acc", "test_acc"]))
 # Finish the run (Logger)
 close(lg)
+
+df = DataFrame(permutedims(hcat(res...),(2,1)), ["Model", "Γ/k", "valid_acc", "test_acc"])
+
 
 id = (seed=seed, ui=ui, reg=reg)
 savef = joinpath(datadir("triplet", dataset, "$(seed)"), "$(run_name).bson");
 results = (
     model=metric, metric=_metric, seed=seed, params=ps, iters=iters, 
     learning_rate=learning_rate, batch_size=batch_size, history=history, 
-    train=train, val=val, test=test, ui=id[:ui]
+    train=train, val=val, test=test, ui=id[:ui], res=df, 
 )
 
 result = Dict{Symbol, Any}([sym=>val for (sym,val) in pairs(results)]); # this has to be a Dict 
