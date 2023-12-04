@@ -37,7 +37,7 @@ function OfflineBatchHardTriplets(model, x, y)
 end
 
 # Batching function
-function TripletCreation(type_="balanced", data, batch_size, metric)
+function TripletCreation(type_, data, batch_size, metric)
     if type_=="balanced"
         return SampleTriplets(data[1], data[2], batch_size, true)
     elseif type_=="batch_hard"
