@@ -4,7 +4,7 @@ module KnnOnTrees
 using DrWatson
 using Statistics, ProgressBars
 using Mill
-using GHMill # treeloss function 
+#using GHMill # treeloss function 
 # dataloading
 using MLDatasets, JSON3, JsonGrinder, MLUtils, Random
 # utils 
@@ -34,7 +34,7 @@ export SampleTriplets, OfflineBatchHardTriplets#, triplet_loss
 
 #include("treeloss/printing.jl")
 
-include("treeloss.jl")
-export weighted_tree_distance
+#include("treeloss.jl")
+#export weighted_tree_distance
 
 end # module 
