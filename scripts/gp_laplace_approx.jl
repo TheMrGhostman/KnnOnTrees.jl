@@ -38,8 +38,7 @@ end
 
 parsed_args = parse_args(ARGS, s)
 @unpack dataset, seed, iters, kernel, ui = parsed_args
-# dataset, seed, iters, learning_rate, batch_size, ui = "Mutagenesis", 666, 1000, 1e-2, 10, 111
-dataset, seed, iters, kernel, ui = "Mutagenesis", 666, 1, "Laplacian", 1001
+#dataset, seed, iters, kernel, ui = "Mutagenesis", 666, 1, "Laplacian", 1001
 
 run_name = "LatentGP-LA-$(dataset)-seed=$(seed)-kernel=$(kernel)-ui=$(ui)"
 # Initialize logger
