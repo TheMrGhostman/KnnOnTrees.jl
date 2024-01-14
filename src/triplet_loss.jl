@@ -36,6 +36,25 @@ function OfflineBatchHardTriplets(model, x, y)
     return xₐ, xₚ, xₙ
 end
 
+
+function MagnetBatch(model, x, y, k)
+    # idealy y should have the same number of elements from all classes
+    pw_matrix = pairwise(model, x, x)
+    pw_labels = pairwise(==, y, y)
+    diag_ones = diagm(ones(length(y)))
+    max_ = maximum(pw_matrix)
+
+    # k closest (positive)
+    
+    same_class_pdm = pw_matrix .* (pw_labels .- diag_ones)
+    [same_class_pdm.==0] .+= max_ + 1
+    sorted_idx = sortperm(same_class_pdm, dims=2) # sorted columns / row-wise
+    k_pos_closest = same_class_pdm[sorted_idx][:,1:k] # keep k columns
+    
+
+end
+
+
 # Batching function
 function TripletCreation(type_, data, batch_size, metric)
     if type_=="balanced"
