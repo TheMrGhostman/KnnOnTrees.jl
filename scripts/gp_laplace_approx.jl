@@ -30,6 +30,10 @@ s = ArgParseSettings()
         arg_type = String
         help = "Kernel"
         default = "LaplacianHMILKernel"
+    "gamma"
+        arg_type = String
+        help = "let γ parameter trainable \"trainable\" or \"nontrainable\" "
+        default = "nontrainable"
     "ui"
         arg_type = Int
         help = "unique identifier"
@@ -37,10 +41,11 @@ s = ArgParseSettings()
 end
 
 parsed_args = parse_args(ARGS, s)
-@unpack dataset, seed, iters, kernel, ui = parsed_args
+@unpack dataset, seed, iters, kernel, gamma, ui = parsed_args
 #dataset, seed, iters, kernel, ui = "Mutagenesis", 666, 1, "Laplacian", 1001
+trainable_ = gamma == "trainable";
 
-run_name = "LatentGP-LA-$(dataset)-seed=$(seed)-kernel=$(kernel)-ui=$(ui)"
+run_name = "LatentGP-LA-$(dataset)-seed=$(seed)-kernel=$(kernel)-gamma=$(gamma)--ui=$(ui)"
 # Initialize logger
 lg = WandbLogger(project ="TripletLoss",
                  name = run_name,
@@ -48,6 +53,7 @@ lg = WandbLogger(project ="TripletLoss",
                                "kernel" => kernel,
                                "transformation" => "Softplus",
                                "initialization" => "0.54 ⋅ ones",
+                               "gamma" => gamma,
                                "dataset" => dataset,
                                "iters" => iters,
                                "seed" => seed,
@@ -68,18 +74,21 @@ test[2][:] = test[2][:] .- 1.0;
 
 # 1) define metrics
 metric = reflectmetric(data[1][1], weight_sampler=x->0.54.*ones(x), weight_transform=softplus)
+# 2) specify kernel
+KernelConstructor_ = LaplacianHMILKernel # TODO add more options | Laplacian is the first
+Kernel = KernelConstructor_(metric, 1.0; trainable=trainable_)
+# 3) initialize θ
+θ_init, m_st = Flux.destructure(Kernel)
+θ_names = destructure_metric_to_ws(Kernel.d);
 
-# 2) build_latent_gp function 
+# 4) build_latent_gp function 
 function build_latent_gp(θ)    
-    θ_, f_ = Flux.destructure(metric)
-    kernel_ = LaplacianHMILKernel(f_(θ)) # TODO change kernel option
+    θ_, f_ = Flux.destructure(Kernel)
+    kernel_ = f_(θ) #KernelConstructor(f_(θ)) 
     dist_y_given_f = BernoulliLikelihood()  # has logistic invlink by default
     jitter = 1e-3  # required for numeric stability
     return LatentGP(GP(kernel_), dist_y_given_f, jitter)
 end;
-
-# 3) initialize θ
-θ_init, m_st = Flux.destructure(metric)
 
 # 4) build_laplace_objective
 objective = build_laplace_objective(build_latent_gp, train...)
@@ -130,12 +139,12 @@ update_config!(lg, Dict(
 
 close(lg)
 
-id = (seed=seed, ui=kernel, kernel=kernel)
+id = (seed=seed, ui=ui, kernel=kernel)
 savef = joinpath(datadir("GPs", dataset, "$(seed)"), "$(run_name).bson");
 results = (
     # basic log
     model=lf, # LatentGP
-    metric=m_st(θ_best), 
+    kernel=m_st(θ_best), 
     seed=seed, 
     params=θ_best, 
     iters=iters, 

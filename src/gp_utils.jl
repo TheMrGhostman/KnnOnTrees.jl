@@ -23,7 +23,7 @@ end
 """
 LinearHMILKernel is equivalent to Linear Kernel with HMILDicence instead 
 """
-struct LinearHMILKernel <:AbstractHMILKernel #<: KernelFunctions.Kernel
+struct LinearHMILKernel <:AbstractHMILKernel 
     d::AbstractMetric
 end
 
@@ -34,17 +34,28 @@ Flux.trainable(k::LinearHMILKernel) = (k.d,)
 (k::LinearHMILKernel)(x::Mill.AbstractMillNode) = k.d(x,x) # special version
 
 
-struct LaplacianHMILKernel <:AbstractHMILKernel #<: KernelFunctions.Kernel
+struct LaplacianHMILKernel <:AbstractHMILKernel 
+    γ::Union{Vector, Number} # if γ<: Number -> nontrainable param ; if γ <: Vector -> trainable param #TODO think of better way
     d::AbstractMetric
 end
-#LaplacianHMILKernel(γ::Real, d::AbstractMetric) = LaplacianHMILKernel([γ], d)
+
+"""
+Constructor for LaplacianHMILKernel
+
+    k(x,x') = exp( -γ ̇d(x,x'))
+
+    d::AbstractMetric   ... base matric function
+    γ::Real             ... scale parameter
+    trainabel::Bool     ... bool if to optimise γ or not
+"""
+LaplacianHMILKernel(d::AbstractMetric, γ::Real=1.0; trainable::Bool=false) = LaplacianHMILKernel(trainable ? [γ] : γ, d)
+
 
 Flux.@functor LaplacianHMILKernel
-Flux.trainable(k::LaplacianHMILKernel) = (k.d, )
+Flux.trainable(k::LaplacianHMILKernel) = (k.d, k.γ) # we can do if/else "trainable" here but Flux.destructure will ignore this anyway
 
-(k::LaplacianHMILKernel)(x::AbstractMillNode,y::AbstractMillNode) = exp.(-mean(k.d(x,y)))
-(k::LaplacianHMILKernel)(x::Mill.AbstractMillNode) = exp.(-k.d(x,x))
-
+(k::LaplacianHMILKernel)(x::AbstractMillNode,y::AbstractMillNode) = exp.(-only(k.γ) .* mean(k.d(x,y)))
+(k::LaplacianHMILKernel)(x::Mill.AbstractMillNode) = exp.(-only(k.γ) .* k.d(x,x))
 
 struct PolynomialHMILKernel <:AbstractHMILKernel #<: KernelFunctions.Kernel
     γ::Vector
