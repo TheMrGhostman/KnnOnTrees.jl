@@ -8,7 +8,7 @@ abstract type AbstractHMILKernel <: KernelFunctions.Kernel end
 
 # Tailor-made functions for GP libraries to accept HMill data
 
-reduce_catobs(x) = Zygote.ignore(()->reduce(catobs, x)) # catobs does not have rrule so it needs to be ignored by AD
+reduce_catobs(x) = Zygote.ignore(()->HMillDistance.preprocess(reduce(catobs, x))) # catobs does not have rrule so it needs to be ignored by AD
 KernelFunctions.kernelmatrix(κ::AbstractHMILKernel, x::MillVec) = κ(reduce_catobs(x))
 
 # This fixes error which comes from missing / unfitting chain rule for diagnoal matrices
