@@ -30,7 +30,7 @@ include("triplet_loss.jl")
 export SampleTriplets, OfflineBatchHardTriplets, TripletCreation#, triplet_loss
 
 include("gp_utils.jl")
-export AbstractHMILKernel, LinearHMILKernel, LaplacianHMILKernel, Matern32HMILKernel, PolynomialHMILKernel
+export AbstractHMillKernel, LaplacianHMillKernel, Matern32HMillKernel, GaussianHMillKernel, KernelSelector
 
 #include("treeloss/metric.jl")
 #export LeafMetric, ProductMetric, SetMetric, reflectmetric

@@ -28,8 +28,8 @@ s = ArgParseSettings()
         default = 1000
     "kernel"        
         arg_type = String
-        help = "Kernel"
-        default = "LaplacianHMILKernel"
+        help = "Select Kernel option: (\"Laplacian\", \"Gaussian\", \"Matern32\") "
+        default = "Laplacian"
     "gamma"
         arg_type = String
         help = "let γ parameter trainable \"trainable\" or \"nontrainable\" "
@@ -75,8 +75,8 @@ test[2][:] = test[2][:] .- 1.0;
 # 1) define metrics
 metric = reflectmetric(data[1][1], weight_sampler=x->0.54.*ones(x), weight_transform=softplus)
 # 2) specify kernel
-KernelConstructor_ = LaplacianHMILKernel # TODO add more options | Laplacian is the first
-Kernel = KernelConstructor_(metric, 1.0; trainable=trainable_)
+KernelConstructor_ = KernelSelector(kernel; trainable=trainable_) #LaplacianHMillKernel # TODO add more options | Laplacian is the first
+Kernel = KernelConstructor_(metric)#; γ=1.0, trainable=trainable_)
 # 3) initialize θ
 θ_init, m_st = Flux.destructure(Kernel)
 θ_names = destructure_metric_to_ws(Kernel.d);
