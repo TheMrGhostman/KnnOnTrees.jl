@@ -87,9 +87,7 @@ Flux.trainable(k::GaussianHMillKernel) = (k.d, k.γ) # we can do if/else "train
 struct Matern32HMillKernel <:AbstractHMillKernel #<: KernelFunctions.Kernel
     d::AbstractMetric
 end
-
-Matern32HMillKernel(d::AbstractMetric; kwargs...) = Matern32HMillKernel(d)
-
+#Matern32HMillKernel(d::AbstractMetric; kwargs...) = Matern32HMillKernel(d)
 
 Flux.@functor Matern32HMillKernel
 Flux.trainable(k::Matern32HMillKernel) = (k.d,)
