@@ -98,7 +98,7 @@ function (k::Matern32HMillKernel)(x::AbstractMillNode, y::AbstractMillNode)
 end
 
 function (k::Matern32HMillKernel)(x::AbstractMillNode)
-    dist_ = k.d(x,y)
+    dist_ = k.d(x,x)
     return (1.0 .+ (sqrt(3) .* dist_)) .* exp.(-sqrt(3) .* dist_)
 end
 
