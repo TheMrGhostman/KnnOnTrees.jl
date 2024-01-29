@@ -42,7 +42,7 @@ end
 
 parsed_args = parse_args(ARGS, s)
 @unpack dataset, seed, iters, kernel, gamma, ui = parsed_args
-#dataset, seed, iters, kernel, ui = "Mutagenesis", 666, 1, "Laplacian", 1001
+#dataset, seed, iters, kernel, gamma, ui = "Mutagenesis", 666, 1, "Laplacian", "nontrainable",1001
 trainable_ = gamma == "trainable";
 
 run_name = "LatentGP-LA-$(dataset)-seed=$(seed)-kernel=$(kernel)-gamma=$(gamma)--ui=$(ui)"
