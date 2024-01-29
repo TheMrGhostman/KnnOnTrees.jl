@@ -65,9 +65,9 @@ global_logger(lg)
 
 start = time()
 data = load_dataset(dataset; to_mill=true);
-train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, seed=seed, filter_under=0);
+train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, seed=seed, filter_under=10);
 
-unique_classes = sort(unique(data[2]))
+unique_classes = sort(unique(train[2]))
 training_history = Dict()
 
 for class ∈ tqdm(unique_classes)
@@ -98,15 +98,14 @@ for class ∈ tqdm(unique_classes)
     objective = build_laplace_objective(build_latent_gp, train[1], y_train)
 
     # 5) training of GP
-    
     training_results = Optim.optimize(
         objective, θ -> only(Zygote.gradient(objective, θ)), 
         θ_init, 
         LBFGS(), 
         Optim.Options(show_trace=true, iterations = iters, callback = x->wandb_log_callback(x, lg, class), store_trace = false); 
         inplace=false #, callback=print_iter
-    )
-    
+    ) 
+
     # get best/optimized parameters
     θ_best = training_results.minimizer
     lf = build_latent_gp(θ_best)
@@ -122,9 +121,9 @@ for class ∈ tqdm(unique_classes)
     ŷₜ = lf.lik.invlink.(mean(fxₜ))
 
     # compute metrics
-    auc_tr= auc_trapezoidal(prcurve(y_train, ŷₜᵣ)...); # ad auc
-    auc_val= auc_trapezoidal(prcurve(y_valid, ŷᵥ)...); # ad auc
-    auc_tst= auc_trapezoidal(prcurve(y_test, ŷₜ)...); # ad auc
+    auc_tr = try auc_trapezoidal(prcurve(y_train, ŷₜᵣ)...); catch ; 0 end # ad auc
+    auc_val = try auc_trapezoidal(prcurve(y_valid, ŷᵥ)...); catch ; 0 end
+    auc_tst = try auc_trapezoidal(prcurve(y_test, ŷₜ)...); catch ; 0 end
 
     acc_tr = mean(y_train .== (ŷₜᵣ .>= 0.5));
     acc_val = mean(y_valid .== (ŷᵥ .>= 0.5));
@@ -135,7 +134,7 @@ for class ∈ tqdm(unique_classes)
     training_history["c=$(class)-kernel"] = m_st(θ_best)
     training_history["c=$(class)-metric"] = m_st(θ_best).d
     training_history["c=$(class)-params"] = θ_best
-    #training_history["c=$(class)-history"] = training_results
+    training_history["c=$(class)-history"] = training_results
     # posterior distributions and fitine GPs
     training_history["c=$(class)-train_post"] = f_post
     training_history["c=$(class)-valid_post"] = fxᵥ
