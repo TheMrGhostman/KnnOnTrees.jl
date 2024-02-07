@@ -9,7 +9,7 @@ dataset = MLDatasets.TUDataset("MUTAG")
 g1 = dataset[1]
 g1.graphs
 
-function graph2hmill(gr, un=6, depth::Int=3)
+function graph2hmill(gr, un=6, depth::Int=3, pad::bool=false)
     """
     gr .... graph
     un .... number of unique nodes
@@ -21,7 +21,10 @@ function graph2hmill(gr, un=6, depth::Int=3)
     for (i,o) in zip(gr.graphs.edge_index...); add_edge!(dg, i, o); end
 
     # FIXME -> one additional node for empty node placeholder -> (N+1)-th 
-    features = Flux.onehotbatch(vcat(gr.graphs.node_data.targets, un), 0:un)
+    features = Flux.onehotbatch(
+        (pad) ? vcat(gr.graphs.node_data.targets, un) : gr.graphs.node_data.targets, 
+        0:un
+    )
    
     #l1 
     #@info vcat(dg.badjlist, [[0]])
