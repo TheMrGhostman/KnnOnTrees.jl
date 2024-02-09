@@ -13,7 +13,10 @@ using Distributions, DataFrames, StatsBase, LinearAlgebra
 using Flux, Distances, StringDistances, OneHotArrays, Base.Threads
 # stuct
 using Zygote
+# graph2hmill
+using Graphs, GraphRecipes
 
+#hmill dist
 using HMillDistance
 
 
@@ -32,6 +35,8 @@ export SampleTriplets, OfflineBatchHardTriplets, TripletCreation#, triplet_loss
 include("gp_utils.jl")
 export AbstractHMillKernel, LaplacianHMillKernel, Matern32HMillKernel, GaussianHMillKernel, KernelSelector
 
+include("graph2hmill.jl")
+export graph2hmill
 #include("treeloss/metric.jl")
 #export LeafMetric, ProductMetric, SetMetric, reflectmetric
 
