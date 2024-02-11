@@ -46,7 +46,7 @@ end
 
 parsed_args = parse_args(ARGS, s)
 @unpack dataset, seed, iters, batch_size, kernel, gamma, ui = parsed_args
-#dataset, seed, iters, kernel, gamma, ui = "chess", 666, 1, "Laplacian", "nontrainable",1001
+#dataset, seed, iters, batch_size, kernel, gamma, ui = "chess", 666, 1, 10, "Laplacian", "nontrainable",1001
 trainable_ = gamma == "trainable";
 
 run_name = "LatentGP-LA-$(dataset)-seed=$(seed)-kernel=$(kernel)-gamma=$(gamma)--ui=$(ui)"
@@ -77,9 +77,9 @@ training_history = Dict()
 
 for class ∈ tqdm(unique_classes)
     # 0) transform classes
-    y_train = float.(train[2] .== class)
-    y_valid = float.(val[2] .== class)
-    y_test = float.(test[2] .== class)
+    y_train = float.(train[2] .== class);
+    y_valid = float.(val[2] .== class);
+    y_test = float.(test[2] .== class);
 
     # 1) define metrics
     metric = reflectmetric(data[1][1], weight_sampler=x->0.54.*ones(x), weight_transform=softplus)
@@ -99,27 +99,28 @@ for class ∈ tqdm(unique_classes)
         return LatentGP(GP(kernel_), dist_y_given_f, jitter)
     end;
 
-    # 4) build_laplace_objective
-    objective = build_laplace_objective(build_latent_gp, train[1], y_train)
-    objective(θ) = begin
-        
-        build_laplace_objective(build_latent_gp, train[1], y_train)
+
+    θ_new = θ_init
+    opt = LBFGS()
+    for batch in 1:iters
+        sample_idx = sample(1:length(train[2]), batch_size, replace=false)
+        objective = build_laplace_objective(build_latent_gp, train[1][sample_idx], y_train[sample_idx])
+        # 5) training of GP
+        training_results = Optim.optimize(
+            objective, θ -> only(Zygote.gradient(objective, θ)), 
+            θ_new, 
+            opt, 
+            Optim.Options(show_trace=true, iterations = 1, store_trace = true); 
+            inplace=false #, callback=print_iter # iterations=iters # , callback = x->wandb_log_callback(x, lg, class)
+        ) 
+        global θ_new = training_results.minimizer
+        #@info training_results.trace
     end
-
-    # 5) training of GP
-    training_results = Optim.optimize(
-        objective, θ -> only(Zygote.gradient(objective, θ)), 
-        θ_init, 
-        LBFGS(), 
-        Optim.Options(show_trace=true, iterations = iters, callback = x->wandb_log_callback(x, lg, class), store_trace = false); 
-        inplace=false #, callback=print_iter
-    ) 
-
     # get best/optimized parameters
-    θ_best = training_results.minimizer
+    θ_best = θ_new #training_results.minimizer
     lf = build_latent_gp(θ_best)
     # compute approximate posterior on training data
-    f_post = posterior(LaplaceApproximation(; f_init=objective.cache.f), lf(train[1]), y_train)
+    f_post = posterior(LaplaceApproximation(), lf(train[1]), y_train)#; f_init=objective.cache.f
     ŷₜᵣ = lf.lik.invlink.(mean(f_post(train[1])))
 
     # predict validation set (FiniteGP)
@@ -143,7 +144,7 @@ for class ∈ tqdm(unique_classes)
     training_history["c=$(class)-kernel"] = m_st(θ_best)
     training_history["c=$(class)-metric"] = m_st(θ_best).d
     training_history["c=$(class)-params"] = θ_best
-    training_history["c=$(class)-history"] = training_results
+    #training_history["c=$(class)-history"] = training_results
     # posterior distributions and fitine GPs
     training_history["c=$(class)-train_post"] = f_post
     training_history["c=$(class)-valid_post"] = fxᵥ
