@@ -54,7 +54,7 @@ end
 parsed_args = parse_args(ARGS, s)
 @unpack dataset, seed, iters, learning_rate, batch_size, reg, gamma, margin, ui, log_pars, triplet_creation = parsed_args
 # dataset, seed, iters, learning_rate, batch_size, ui = "Mutagenesis", 666, 1000, 1e-2, 10, 111
-
+@info parsed_args
 
 run_name = "TripletLoss-$(dataset)-seed=$(seed)-ui=$(ui)-TC=$(triplet_creation)"
 # Initialize logger
@@ -77,10 +77,9 @@ lg = WandbLogger(project ="TripletLoss",#"Julia-testing",
 # Use LoggingExtras.jl to log to multiple loggers together
 global_logger(lg)
 
-
 start = time()
 data = load_dataset(dataset; to_mill=true);
-train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, seed=seed, filter_under=0);
+train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, seed=seed, filter_under=10);
 
 # Loss function
 #  xₐ, xₚ, xₙ, α ≈ anchor, positive, negative, margin
@@ -157,7 +156,7 @@ rbfkernel(x, γ) = exp.(-(x .^2) ./ γ)
 
 
 res = []
-for γ ∈ tqdm(0:0.01:2)
+for γ ∈ tqdm(0:0.05:2) # 0.01
     model = svmtrain(rbfkernel(gm_tr, γ), train[2]; kernel=LIBSVM.Kernel.Precomputed, verbose=false);
 
     y_train_pr, _ = svmpredict(model, rbfkernel(gm_tr, γ));

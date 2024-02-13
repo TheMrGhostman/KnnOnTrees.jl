@@ -1,5 +1,5 @@
 #using Revise
-using ArgParse, DrWatson, BSON, DataFrames, Random
+using ArgParse, DrWatson, BSON, DataFrames, Random, Serialization
 using Flux, Zygote, Mill, Statistics, KnnOnTrees, LinearAlgebra, EvalMetrics
 using Wandb, Dates, Logging, ProgressBars, BenchmarkTools
 using HMillDistance, Optim
@@ -125,7 +125,8 @@ acc_tr = mean(train[2] .== (ŷₜᵣ .>= 0.5));
 acc_val = mean(val[2] .== (ŷᵥ .>= 0.5));
 acc_tst = mean(test[2] .== (ŷₜ .>= 0.5));
 
-
+parameters = Wandb.Table(data=hcat(string.(θ_names[1]),θ_best), columns=["names", "values"])
+Wandb.log(lg, Dict("parameters_tab"=>parameters,))
 
 update_config!(lg, Dict(
     "auc_train" => round(auc_tr, digits=3), 
@@ -169,9 +170,11 @@ results = (
 )
 
 result = Dict{Symbol, Any}([sym=>val for (sym,val) in pairs(results)]); # this has to be a Dict 
-tagsave(savef, result, safe = true);
+serialize(joinpath(datadir("GPs", dataset, "$(seed)"), "$(run_name).jls"), result) # should work too
+#tagsave(savef, result, safe = true);
 @info "Results were saved into file $(savef)"
 et = floor(time()-start)
 @info "Elapsed time: $(et) s"
+println("Results were saved into file $(savef)")
 
 

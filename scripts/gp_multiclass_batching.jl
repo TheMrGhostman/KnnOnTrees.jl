@@ -110,10 +110,10 @@ for class ∈ tqdm(unique_classes)
             objective, θ -> only(Zygote.gradient(objective, θ)), 
             θ_new, 
             opt, 
-            Optim.Options(show_trace=true, iterations = 1, store_trace = true); 
+            Optim.Options(show_trace=true, iterations = 1, callback = x->wandb_log_callback(x, lg, class), store_trace = false); 
             inplace=false #, callback=print_iter # iterations=iters # , callback = x->wandb_log_callback(x, lg, class)
         ) 
-        global θ_new = training_results.minimizer
+        θ_new = training_results.minimizer
         #@info training_results.trace
     end
     # get best/optimized parameters
