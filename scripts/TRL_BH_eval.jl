@@ -49,10 +49,14 @@ s = ArgParseSettings()
         arg_type = String
         help = "Type of creation of triplets -> (\"batch_hard\", \"balanced\", \"switching\")"
         default="batch_hard"
+    "homogen_depth"
+        arg_type = Int
+        help = "Depth of tree which is created from homogenous Graphs (TUDataset). For other data argument is ignored!"
+        default = 4
 end
 
 parsed_args = parse_args(ARGS, s)
-@unpack dataset, seed, iters, learning_rate, batch_size, reg, gamma, margin, ui, log_pars, triplet_creation = parsed_args
+@unpack dataset, seed, iters, learning_rate, batch_size, reg, gamma, margin, ui, log_pars, triplet_creation, homogen_depth = parsed_args
 # dataset, seed, iters, learning_rate, batch_size, ui = "Mutagenesis", 666, 1000, 1e-2, 10, 111
 @info parsed_args
 
@@ -69,6 +73,7 @@ lg = WandbLogger(project ="TripletLoss",#"Julia-testing",
                                "gamma" => gamma,
                                "margin"=> margin,
                                "dataset" => dataset,
+                               "homogen_depth" => homogen_depth,
                                "iters" => iters,
                                "seed" => seed,
                                "ui" => ui,
@@ -78,7 +83,7 @@ lg = WandbLogger(project ="TripletLoss",#"Julia-testing",
 global_logger(lg)
 
 start = time()
-data = load_dataset(dataset; to_mill=true);
+data = load_dataset(dataset; to_mill=true, to_pad_leafs=false, depth=homogen_depth);
 train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, seed=seed, filter_under=10);
 
 # Loss function
@@ -199,6 +204,14 @@ _,argmax_ = findmax(knn_matrix[:,end])
 Wandb.log(lg, Dict("KNN_plot"=>accs_plot2, "KNN_tab"=>KNN_results))
 update_config!(lg, Dict("KNN-(k|v|t)" => round.(knn_matrix[argmax_, :], digits=3), "KNN-max"=>round(knn_matrix[argmax_, end], digits=4)))
 
+
+# log parameters in Table
+θ_names = destructure_metric_to_ws(metric)
+θ_best = Flux.destructure(metric)[1]
+parameters = Wandb.Table(data=hcat(string.(θ_names[1]), θ_best), columns=["names", "values"])
+Wandb.log(lg, Dict("parameters_tab"=>parameters,))
+
+
 # Finish the run (Logger)
 close(lg)
 
@@ -206,12 +219,23 @@ close(lg)
 id = (seed=seed, ui=ui, reg=reg)
 savedir = datadir("triplet", dataset, "$(seed)") 
 results = (
-    model=metric, metric=_metric, seed=seed, params=ps, iters=iters, 
-    learning_rate=learning_rate, batch_size=batch_size, history=history, 
-    train=train, val=val, test=test, ui=id[:ui], 
+    model=metric, 
+    metric=_metric, 
+    seed=seed, 
+    params=θ_best, 
+    ps = ps,
+    param_names=θ_names,
+    iters=iters, 
+    learning_rate=learning_rate, 
+    batch_size=batch_size, 
+    history=history, 
+    train=train, 
+    val=val, 
+    test=test, 
+    ui=id[:ui], 
     svm_res = DataFrame(svm_matrix, svm_columns),
-    knn_res = DataFrame(knn_matrix, knn_columns)
-
+    knn_res = DataFrame(knn_matrix, knn_columns),
+    homogen_depth = homogen_depth
 )
 
 result = Dict{Symbol, Any}([sym=>val for (sym,val) in pairs(results)]); # this has to be a Dict 
