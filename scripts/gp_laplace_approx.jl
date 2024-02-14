@@ -65,12 +65,8 @@ global_logger(lg)
 
 start = time()
 data = load_dataset(dataset; to_mill=true);
+data[2] .= binary_class_transform(data[2], (-1,1)) # GP implementation require classes (-1,1)
 train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, seed=seed, filter_under=0);
-
-# TODO make it properly
-train[2][:] = train[2][:] .- 1.0;
-val[2][:] = val[2][:] .- 1.0;
-test[2][:] = test[2][:] .- 1.0;
 
 # 1) define metrics
 metric = reflectmetric(data[1][1], weight_sampler=x->0.54.*ones(x), weight_transform=softplus)

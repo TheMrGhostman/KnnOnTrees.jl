@@ -39,6 +39,20 @@ function _to_mill(x)
 end
 
 
+function binary_class_transform(y, new_class_values::Tuple{Number, Number}=(-1,1))
+    orig_class_idx = sort(unique(y))
+    @assert length(orig_class_idx) == 2
+    new_class_idx = sort([new_class_values...])
+    if orig_class_idx == new_class_idx
+        return y
+    else
+        new_y = similar(y)
+        new_y[y .== orig_class_idx[1]] .= new_class_values[1]
+        new_y[y .== orig_class_idx[2]] .= new_class_values[2]
+        return new_y
+    end
+end
+
 function filter_out_classes_under_n_observations(y::AbstractVector, n::Int)
     cm = countmap(y)
     kv = [(k,cm[k]) for k in keys(cm)]
