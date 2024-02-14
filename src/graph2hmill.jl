@@ -26,7 +26,13 @@ function graph2hmill(graph::MLDatasets.Graph, unique_nodes::Int, depth::Int=3; p
     if depth == 1
         BagNode(features, lvl0)
     else
-        BagNode(recursive_levels(depth-1, lvl1, features, lvl1, N, pad), lvl0)
+        BagNode(
+            ProductNode((
+                data = features,
+                bonds=recursive_levels(depth-1, lvl1, features, lvl1, N, pad)
+                )), 
+            lvl0
+        )
     end
 end
 
@@ -47,6 +53,27 @@ function recursive_levels(lvl_to_go, nodelist, features, edges, n, pad::Bool=tru
         )
     end
 end
+
+#=
+function recursive_levels(lvl_to_go, nodelist, features, edges, n, pad::Bool=true)
+
+    nodes, bags, data_indexes = get_bags_and_indexes(nodelist, n, pad)
+
+    if lvl_to_go == 1
+        return BagNode(features[:, data_indexes], bags)
+    else
+        new_nodes = [[edges[e] for e ∈ nodes[i]] for i ∈ eachindex(nodes)]
+        return BagNode(
+            ProductNode((
+                data=features[:, data_indexes], 
+                bonds=recursive_levels(lvl_to_go-1, new_nodes, features, edges, n)
+                )), 
+            bags
+        )
+    end
+end
+=#
+
 
 function get_bags_and_indexes(list, n, pad::Bool=true)
     if eltype(list) <: Vector{Int}
