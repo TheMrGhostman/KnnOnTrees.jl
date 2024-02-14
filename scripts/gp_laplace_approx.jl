@@ -137,7 +137,7 @@ update_config!(lg, Dict(
 close(lg)
 
 id = (seed=seed, ui=ui, kernel=kernel)
-savef = joinpath(datadir("GPs", dataset, "$(seed)"), "$(run_name)");
+savedir = datadir("GPs", dataset, "$(seed)")
 results = (
     # basic log
     model=lf, # LatentGP
@@ -166,11 +166,14 @@ results = (
 )
 
 result = Dict{Symbol, Any}([sym=>val for (sym,val) in pairs(results)]); # this has to be a Dict 
-serialize(join([savef, ".jls"]), result)
-#tagsave(join([savef, ".bson"]), result, safe = true);
-@info "Results were saved into file $(savef) (.bson / .jls)"
+if !ispath(savedir)
+    mkpath(savedir)
+end
+serialize(joinpath(savedir, "$(run_name).jls"), result) 
+#tagsave(joinpath(savedir, "$(run_name).bson"), result, safe = true);
+@info "Results were saved into file $(savedir) --- $(run_name) (.bson / .jls)"
 et = floor(time()-start)
 @info "Elapsed time: $(et) s"
-println("Results were saved into file $(savef) (.bson / .jls)")
+println("Results were saved into file $(savedir) --- $(run_name) (.bson / .jls)")
 
 

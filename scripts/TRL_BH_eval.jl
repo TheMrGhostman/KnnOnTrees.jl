@@ -204,7 +204,7 @@ close(lg)
 
 
 id = (seed=seed, ui=ui, reg=reg)
-savef = joinpath(datadir("triplet", dataset, "$(seed)"), "$(run_name)");
+savedir = datadir("triplet", dataset, "$(seed)") 
 results = (
     model=metric, metric=_metric, seed=seed, params=ps, iters=iters, 
     learning_rate=learning_rate, batch_size=batch_size, history=history, 
@@ -215,8 +215,12 @@ results = (
 )
 
 result = Dict{Symbol, Any}([sym=>val for (sym,val) in pairs(results)]); # this has to be a Dict 
-serialize(join([savef, ".jls"]), result)
-tagsave(join([savef, ".bson"]), result, safe = true);
-@info "Results were saved into file $(savef)"
+if !ispath(savedir)
+    mkpath(savedir)
+end
+serialize(joinpath(savedir, "$(run_name).jls"), result) 
+tagsave(joinpath(savedir, "$(run_name).bson"), result, safe = true);
+@info "Results were saved into file $(savedir)"
 et = floor(time()-start)
 @info "Elapsed time: $(et) s"
+println("Results were saved into file $(savedir) --- $(run_name) (.bson / .jls)")
