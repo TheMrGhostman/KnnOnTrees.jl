@@ -6,7 +6,7 @@ function get_list_of_datasets()
 end
 
 
-function load_dataset(name; to_mill::Bool=true, to_pad_leafs::Bool=false, depth::Int=3)
+function load_dataset(name; to_mill::Bool=true, to_pad_leafs::Bool=false, depth::Int=4)
     #@assert name in get_list_of_datasets()
     #name = lowercase(name)
     if  name in ["mutagenesis", "Mutagenesis"]
