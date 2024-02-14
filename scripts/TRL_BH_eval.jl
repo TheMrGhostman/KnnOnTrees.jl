@@ -53,10 +53,15 @@ s = ArgParseSettings()
         arg_type = Int
         help = "Depth of tree which is created from homogenous Graphs (TUDataset). For other data argument is ignored!"
         default = 4
+    "bag_metric"
+        arg_type = String
+        help = "Which type of metric to use for comparision of bags \\
+                 options: (\"Chamfer\", \"WassersteinProbDist\", \"WassersteinMultiset\", \"Hausdorff\" )"
+        default="Chamfer"
 end
 
 parsed_args = parse_args(ARGS, s)
-@unpack dataset, seed, iters, learning_rate, batch_size, reg, gamma, margin, ui, log_pars, triplet_creation, homogen_depth = parsed_args
+@unpack dataset, seed, iters, learning_rate, batch_size, reg, gamma, margin, ui, log_pars, triplet_creation, homogen_depth, bag_metric = parsed_args
 # dataset, seed, iters, learning_rate, batch_size, ui = "Mutagenesis", 666, 1000, 1e-2, 10, 111
 @info parsed_args
 
@@ -74,6 +79,7 @@ lg = WandbLogger(project ="TripletLoss",#"Julia-testing",
                                "margin"=> margin,
                                "dataset" => dataset,
                                "homogen_depth" => homogen_depth,
+                               "bag_metric" => bag_metric,
                                "iters" => iters,
                                "seed" => seed,
                                "ui" => ui,
@@ -96,7 +102,7 @@ triplet_loss(model, xₐ, xₚ, xₙ, α=0) = mean( model.(xₐ, xₚ) .- model.
 triplet_accuracy(model, xₐ, xₚ, xₙ) = mean(model.(xₐ, xₚ) .<= model.(xₐ, xₙ)) # Not exactly accuracy
 # I assume that possitive and anchor should be closer to each other
 
-
+#TODO add bag_metric switch
 # metric
 Random.seed!(ui) # rondom initialization of weights with fiexed seed
 _metric = reflectmetric(train[1][1]; weight_sampler=randn, weight_transform=softplus)
@@ -223,7 +229,6 @@ results = (
     metric=_metric, 
     seed=seed, 
     params=θ_best, 
-    ps = ps,
     param_names=θ_names,
     iters=iters, 
     learning_rate=learning_rate, 
