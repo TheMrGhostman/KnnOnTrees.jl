@@ -1,4 +1,4 @@
-using ArgParse, DrWatson, BSON, DataFrames, Random
+using ArgParse, DrWatson, BSON, DataFrames, Random, Serialization
 using Flux, Zygote, Mill, Statistics, KnnOnTrees, LinearAlgebra
 using Wandb, Dates, Logging, ProgressBars
 using HMillDistance, LIBSVM # SVM
@@ -204,7 +204,7 @@ close(lg)
 
 
 id = (seed=seed, ui=ui, reg=reg)
-savef = joinpath(datadir("triplet", dataset, "$(seed)"), "$(run_name).bson");
+savef = joinpath(datadir("triplet", dataset, "$(seed)"), "$(run_name)");
 results = (
     model=metric, metric=_metric, seed=seed, params=ps, iters=iters, 
     learning_rate=learning_rate, batch_size=batch_size, history=history, 
@@ -215,7 +215,8 @@ results = (
 )
 
 result = Dict{Symbol, Any}([sym=>val for (sym,val) in pairs(results)]); # this has to be a Dict 
-tagsave(savef, result, safe = true);
+serialize(join([savef, ".jls"]), result)
+tagsave(join([savef, ".bson"]), result, safe = true);
 @info "Results were saved into file $(savef)"
 et = floor(time()-start)
 @info "Elapsed time: $(et) s"

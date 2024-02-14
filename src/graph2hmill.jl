@@ -47,12 +47,13 @@ function recursive_levels(lvl_to_go, nodelist, features, edges, n, pad::Bool=tru
         return BagNode(
             ProductNode((
                 data=features[:, data_indexes], 
-                bonds=recursive_levels(lvl_to_go-1, new_nodes, features, edges, n)
+                bonds=recursive_levels(lvl_to_go-1, new_nodes, features, edges, n, pad)
                 )), 
             bags
         )
     end
 end
+
 
 #=
 function recursive_levels(lvl_to_go, nodelist, features, edges, n, pad::Bool=true)
@@ -89,6 +90,11 @@ function get_bags_and_indexes(list, n, pad::Bool=true)
     end
 end
 
+
+function get_n_unique_nodes(dataset)
+    x = vcat([dataset[i].graphs.node_data.targets |> unique for i in 1:length(dataset)]...) |> unique
+    return x
+end
 
 """
 Returns two simple graphs for debugging purposes
