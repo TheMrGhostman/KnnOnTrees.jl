@@ -20,8 +20,10 @@ function load_dataset(name; to_mill::Bool=true, to_pad_leafs::Bool=false, depth:
         y = data.y
     else
         data = MLDatasets.TUDataset(name)
-        n_class = get_n_unique_nodes(data) |> length
-        transform = (to_mill) ? x->graph2hmill(x, n_class, depth; pad=to_pad_leafs) : identity
+        un_classes = get_n_unique_nodes(data)
+        n_class =  un_classes |> length
+        transf = (n_class < maximum(un_classes)) ? _create_transition_sheet(un_classes, 0)[1] : identity
+        transform = (to_mill) ? x->graph2hmill(x, n_class, depth; pad=to_pad_leafs, tt=transf) : identity
         X = [transform(data[i].graphs) for i in only(axes(data))]
         y = data.graph_data.targets
         to_mill = false # no need to du _to_mill anymore

@@ -1,5 +1,5 @@
 """
-    graph2hmill(graph::MLDatasets.Graph, unique_nodes::Int, depth::Int=3; pad::Bool=true)
+    graph2hmill(graph::MLDatasets.Graph, unique_nodes::Int, depth::Int=3; pad::Bool=true, tt::Function=identity)
 
     Function takes MLDatasets.Graph and transform it into Hierarchical Multiinstance Learning data 
     (Mill.jl framework), while new HMIL data are formated to be equivalent to procedure described in paper 
@@ -7,17 +7,22 @@
     Ching-Yao Chuang and Stefanie Jegelka (2022)
         Tree Mover's Distance: Bridging Graph Metrics and Stability of Graph Neural Networks
 
+    If targets are unresonable, i.e. [5, 10, 100], targets should be transfromed to [0,1,2]. 
+    To remove redundant dimensions from OneHot representation, because they do not have any underlaying information.
+    (Or we did not find any in their description) \"tt ≈ target transformation\"
 }
 """
-function graph2hmill(graph::MLDatasets.Graph, unique_nodes::Int, depth::Int=3; pad::Bool=true)
+function graph2hmill(graph::MLDatasets.Graph, unique_nodes::Int, depth::Int=3; pad::Bool=true, tt::Function=identity)
     # to Directed graph Type -> just simplifies extraction of badjlist etc. (+ ploting is available etc.)
     @assert depth > 0
     N = graph.num_nodes
     dg = SimpleDiGraph(N)
     for (i,o) in zip(graph.edge_index...); add_edge!(dg, i, o); end
  
-    features = Flux.onehotbatch(graph.node_data.targets, 0:unique_nodes-1)
-    features = (pad) ? hcat(features, zeros(eltype(features), unique_nodes, 1)) : features # if to pad
+    targets = Flux.onehotbatch(tt.(graph.node_data.targets), 0:unique_nodes-1)
+    features = (:features in keys(graph.node_data)) ? vcat(graph.node_data.features, targets) : targets
+    dim_feat = (:features in keys(graph.node_data)) ? size(features, 1) : unique_nodes
+    features = (pad) ? hcat(features, zeros(eltype(features), dim_feat, 1)) : features # if to pad
    
     # if pad => UN x (N+1) else => UN x N
     # lvl 0 -> "root" to all vertices (nodes)
@@ -52,6 +57,16 @@ function recursive_levels(lvl_to_go, nodelist, features, edges, n, pad::Bool=tru
             bags
         )
     end
+end
+
+"""
+    _create_transition_sheet(x::Vector)
+"""
+function _create_transition_sheet(x::Vector, min=0)
+    present_ = sort(unique(x))
+    new_ = collect(min:min+length(present_))
+    transition_dict = Dict([i => j for (i,j) in zip(present_, new_)])
+    return x->transition_dict[x], transition_dict
 end
 
 

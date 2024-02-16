@@ -36,7 +36,7 @@ include("gp_utils.jl")
 export AbstractHMillKernel, LaplacianHMillKernel, Matern32HMillKernel, GaussianHMillKernel, KernelSelector
 
 include("graph2hmill.jl")
-export graph2hmill
+export graph2hmill, _create_transition_sheet
 #include("treeloss/metric.jl")
 #export LeafMetric, ProductMetric, SetMetric, reflectmetric
 
