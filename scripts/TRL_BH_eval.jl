@@ -129,7 +129,8 @@ for iter ∈ tqdm(1:iters)
     # Logging training
     acc_ = triplet_accuracy(metric, xₐ, xₚ, xₙ)
     if mod(iter, 20)==0
-        xₐᵥ, xₚᵥ, xₙᵥ = SampleTriplets(val..., length(val[2]), false); # There is sampling too
+        vbc = (length(val[2]) > 50) ? batch_size, length(val[2])
+        xₐᵥ, xₚᵥ, xₙᵥ = SampleTriplets(val..., vbc, false); # There is sampling too
         v_loss = triplet_loss(metric, xₐᵥ, xₚᵥ, xₙᵥ, α); # Just approximation -> correlates with choices of xₐᵥ, xₚᵥ, xₙᵥ 
         v_acc = triplet_accuracy(metric, xₐᵥ, xₚᵥ, xₙᵥ);
         loss_dict = Dict("Training/Loss"=>loss_, "Training/TripletAccuracy"=>acc_,"Validation/Loss"=>v_loss, "Validation/TripletAccuracy"=>v_acc)
@@ -163,7 +164,7 @@ gm_tr = gram_matrix(train[1], train[1], metric, verbose=false);
 gm_val = gram_matrix(train[1], val[1], metric, verbose=false);
 gm_tst = gram_matrix(train[1], test[1], metric, verbose=false);
 
-rbfkernel(x, γ) = exp.(-(x .^2) ./ γ)
+rbfkernel(x, γ) = exp.(- abs.(x) ./ γ)
 
 
 res = []
