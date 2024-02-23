@@ -56,14 +56,22 @@ s = ArgParseSettings()
     "bag_metric"
         arg_type = String
         help = "Which type of metric to use for comparision of bags \\
-                 options: (\"Chamfer\", \"WassersteinProbDist\", \"WassersteinMultiset\", \"Hausdorff\" )"
-        default="Chamfer"
+                 options: (\"ChamferDistance\", \"WassersteinProbDist\", \"WassersteinMultiset\", \"Hausdorff\" )"
+        default="ChamferDistance"
+    "card_metric"
+        arg_type = String
+        help = "Which type of metric/transfromation to use for cardinality \\
+                options: (\"ScaleOne\", \"MaxCard\")"
+        default = "ScaleOne" 
 end
 
 parsed_args = parse_args(ARGS, s)
-@unpack dataset, seed, iters, learning_rate, batch_size, reg, gamma, margin, ui, log_pars, triplet_creation, homogen_depth, bag_metric = parsed_args
+@unpack dataset, seed, iters, learning_rate, batch_size, reg, gamma, margin, ui, log_pars, triplet_creation, homogen_depth, bag_metric, card_metric = parsed_args
 # dataset, seed, iters, learning_rate, batch_size, ui = "Mutagenesis", 666, 1000, 1e-2, 10, 111
 @info parsed_args
+
+#bag_metric, card_metric = "WassersteinMultiset", "MaxCard"
+#batch_size, iters = 2, 1
 
 run_name = "TripletLoss-$(dataset)-seed=$(seed)-ui=$(ui)-TC=$(triplet_creation)"
 # Initialize logger
@@ -80,6 +88,7 @@ lg = WandbLogger(project ="TripletLoss",#"Julia-testing",
                                "dataset" => dataset,
                                "homogen_depth" => homogen_depth,
                                "bag_metric" => bag_metric,
+                               "card_metric" => card_metric,
                                "iters" => iters,
                                "seed" => seed,
                                "ui" => ui,
@@ -90,6 +99,7 @@ global_logger(lg)
 
 start = time()
 data = load_dataset(dataset; to_mill=true, to_pad_leafs=false, depth=homogen_depth);
+data = (bag_metric == "WassersteinMultiset") ? (HMillDistance.pad_leaves_for_wasserstein.(data[1]), data[2]) : data;
 train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, seed=seed, filter_under=10);
 
 # Loss function
@@ -102,10 +112,12 @@ triplet_loss(model, xₐ, xₚ, xₙ, α=0) = mean( model.(xₐ, xₚ) .- model.
 triplet_accuracy(model, xₐ, xₚ, xₙ) = mean(model.(xₐ, xₚ) .<= model.(xₐ, xₙ)) # Not exactly accuracy
 # I assume that possitive and anchor should be closer to each other
 
-#TODO add bag_metric switch
+# bag_metric and card_metric switch
+bag_m = getfield(HMillDistance, Symbol(bag_metric))
+card_m = getfield(HMillDistance, Symbol(card_metric)) 
 # metric
 Random.seed!(ui) # rondom initialization of weights with fiexed seed
-_metric = reflectmetric(train[1][1]; weight_sampler=randn, weight_transform=softplus)
+_metric = reflectmetric(train[1][1]; set_metric=bag_m, card_metric=card_m, weight_sampler=randn, weight_transform=softplus)
 metric = mean ∘ _metric;
 # trainable parameters & optimizer
 ps = Flux.params(metric);
@@ -241,7 +253,9 @@ results = (
     ui=id[:ui], 
     svm_res = DataFrame(svm_matrix, svm_columns),
     knn_res = DataFrame(knn_matrix, knn_columns),
-    homogen_depth = homogen_depth
+    homogen_depth = homogen_depth,
+    bag_metric=bag_metric,
+    card_metric=card_metric,
 )
 
 result = Dict{Symbol, Any}([sym=>val for (sym,val) in pairs(results)]); # this has to be a Dict 
