@@ -129,7 +129,7 @@ for iter ∈ tqdm(1:iters)
     # Logging training
     acc_ = triplet_accuracy(metric, xₐ, xₚ, xₙ)
     if mod(iter, 20)==0
-        vbc = (length(val[2]) > 50) ? batch_size, length(val[2])
+        vbc = (length(val[2]) > 50) ? batch_size : length(val[2])
         xₐᵥ, xₚᵥ, xₙᵥ = SampleTriplets(val..., vbc, false); # There is sampling too
         v_loss = triplet_loss(metric, xₐᵥ, xₚᵥ, xₙᵥ, α); # Just approximation -> correlates with choices of xₐᵥ, xₚᵥ, xₙᵥ 
         v_acc = triplet_accuracy(metric, xₐᵥ, xₚᵥ, xₙᵥ);
