@@ -33,7 +33,7 @@ include("triplet_loss.jl")
 export SampleTriplets, OfflineBatchHardTriplets, TripletCreation#, triplet_loss
 
 include("gp_utils.jl")
-export AbstractHMillKernel, LaplacianHMillKernel, Matern32HMillKernel, GaussianHMillKernel, KernelSelector
+export AbstractHMillKernel, LaplacianHMillKernel, Matern32HMillKernel, GaussianHMillKernel, KernelSelector, BalancedDisjunctBinaryBatches
 
 include("graph2hmill.jl")
 export graph2hmill, _create_transition_sheet

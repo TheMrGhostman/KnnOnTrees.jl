@@ -102,3 +102,17 @@ function (k::Matern32HMillKernel)(x::AbstractMillNode)
     return (1.0 .+ (sqrt(3) .* dist_)) .* exp.(-sqrt(3) .* dist_)
 end
 
+function BalancedDisjunctBinaryBatches(labels, batch_size; seed=Int(rand(1:1e5)))
+    chunk(arr, n) = [arr[i:min(i + n - 1, end)] for i in 1:n:length(arr)]
+    nb = round(length(labels) / batch_size)
+    cls0 = findall(labels .== 0); 
+    cls1 = findall(labels .== 1);
+    c0perb = round(length(cls0) / nb)
+    c1perb = round(length(cls1) / nb)
+    Random.seed!(seed)
+    cls0 = chunk(cls0[randperm(length(cls0))], Int(c0perb))
+    cls1 = chunk(cls1[randperm(length(cls1))], Int(c1perb))
+    batches = [vcat(c0,c1) for (c0, c1) ∈ zip(cls0, cls1)]
+    batches = [batch[randperm(l)] for (batch, l) in zip(batches, length.(batches))]
+    return batches
+end
