@@ -13,42 +13,10 @@ s = ArgParseSettings()
         arg_type = Int
         help = "Random seed for initialization of data splits"
         default = 666
-    "iters"
-        arg_type = Int
-        help = "Number or iterations"
-        default = 1000
-    "learning_rate"        
-        arg_type = Float64
-        help = "Learning rate for optimizer"
-        default = 0.01
-    "batch_size"        
-        arg_type = Int
-        help = "Batch size"
-        default = 10
-    "reg"
-        arg_type = Float64
-        help = "scale for parameter regularization (added to triplet loss)"
-        default = 0.0
-    "gamma"
-        arg_type = Float64
-        help = "meen value that regularization is pushed to"
-        default = 0.0
-    "margin"
-        arg_type = Float64
-        help = "margin value for triplet loss"
-        default = 1.0
     "ui"
         arg_type = Int
         help = "unique identifier"
         default = Int(rand(1:1e8)) # test for error
-    "log_pars"
-        arg_type = Int
-        help = "if we want to track progres of parameter updates -> 0/1 ≈ false/true"
-        default = 1 
-    "triplet_creation"
-        arg_type = String
-        help = "Type of creation of triplets -> (\"batch_hard\", \"balanced\", \"switching\")"
-        default="batch_hard"
     "homogen_depth"
         arg_type = Int
         help = "Depth of tree which is created from homogenous Graphs (TUDataset). For other data argument is ignored!"
@@ -66,33 +34,24 @@ s = ArgParseSettings()
 end
 
 parsed_args = parse_args(ARGS, s)
-@unpack dataset, seed, iters, learning_rate, batch_size, reg, gamma, margin, ui, log_pars, triplet_creation, homogen_depth, bag_metric, card_metric = parsed_args
-# dataset, seed, iters, learning_rate, batch_size, ui = "Mutagenesis", 666, 1000, 1e-2, 10, 111
+@unpack dataset, seed, ui, homogen_depth, bag_metric, card_metric = parsed_args
+
 @info parsed_args
 
 #bag_metric, card_metric, iters, batch_size, dataset = "WassersteinMultiset", "MaxCard", 1, 2, "hepatitis"
 #batch_size, iters = 2, 1
 
-run_name = "TripletLoss-$(dataset)-seed=$(seed)-ui=$(ui)-TC=$(triplet_creation)"
+run_name = "RS-$(dataset)-seed=$(seed)-ui=$(ui)"
 # Initialize logger
 lg = WandbLogger(project ="TripletLoss",#"Julia-testing",
                  name = run_name,
-                 config = Dict("learning_rate" => learning_rate,
-                               "batch_size" => batch_size,
-                               "triplet_creation" => triplet_creation,
-                               "transformation" => "Softplus",
-                               "initialization" => "randn",
-                               "reg" => reg,
-                               "gamma" => gamma,
-                               "margin"=> margin,
+                 config = Dict("transformation" => "Softplus",
                                "dataset" => dataset,
                                "homogen_depth" => homogen_depth,
                                "bag_metric" => bag_metric,
                                "card_metric" => card_metric,
-                               "iters" => iters,
                                "seed" => seed,
-                               "ui" => ui,
-                               "log_pars"=>log_pars))
+                               "ui" => ui))
 
 # Use LoggingExtras.jl to log to multiple loggers together
 global_logger(lg)
@@ -102,74 +61,22 @@ data = load_dataset(dataset; to_mill=true, to_pad_leafs=false, depth=homogen_dep
 data = (bag_metric == "WassersteinMultiset") ? (HMillDistance.pad_leaves_for_wasserstein.(data[1]), data[2]) : data;
 train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, seed=seed, filter_under=10);
 
-# Loss function
-#  xₐ, xₚ, xₙ, α ≈ anchor, positive, negative, margin
-#triplet_loss(model, xₐ, xₚ, xₙ, α=0) = sum(Flux.mean.(model.(xₐ, xₚ)) .- Flux.mean.(model.(xₐ, xₙ)) .+ α)
-sqnorm(x,b=0) = sum(y->abs2(y .- b), x)
-max_triplet_loss(model, xₐ, xₚ, xₙ, α=0) = max(mean( model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α ), 0) 
-reg_max_triplet_loss(model, xₐ, xₚ, xₙ, α=0, β=0, γ=0) = max(mean( model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α ), 0) + β .* sqrt(sum(x->sqnorm(x,γ), Flux.params(metric)))
-triplet_loss(model, xₐ, xₚ, xₙ, α=0) = mean( model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α )
-triplet_accuracy(model, xₐ, xₚ, xₙ) = mean(model.(xₐ, xₚ) .<= model.(xₐ, xₙ)) # Not exactly accuracy
-# I assume that possitive and anchor should be closer to each other
 
 # bag_metric and card_metric switch
 bag_m = getfield(HMillDistance, Symbol(bag_metric))
 card_m = getfield(HMillDistance, Symbol(card_metric)) 
 # metric
-Random.seed!(ui) # rondom initialization of weights with fiexed seed
 _metric = reflectmetric(train[1][1]; set_metric=bag_m, card_metric=card_m, weight_sampler=randn, weight_transform=softplus)
+
+Random.seed!(ui) # rondom initialization of weights with fiexed seed
+
+θ, f = Flux.destructure(_metric)
+
+
 metric = mean ∘ _metric;
-# trainable parameters & optimizer
-ps = Flux.params(metric);
-opt = ADAM(learning_rate) #opt_state = Flux.setup(ADAM(), metric);
+
+
 Random.seed!()
-
-#margin 
-α = get_config(lg, "margin")
-β = get_config(lg, "reg")
-γ = get_config(lg, "gamma")
-
-history = Dict("Training/Loss"=>[], "Training/TripletAccuracy"=>[], "Validation/Loss"=>[],"Validation/TripletAccuracy"=>[])
-
-for iter ∈ tqdm(1:iters)
-    xₐ, xₚ, xₙ = TripletCreation(triplet_creation, train, batch_size, metric)
-    
-    # Gradients ≈ Forward + Backward
-    loss_, grad = Flux.withgradient(() -> reg_max_triplet_loss(metric, xₐ, xₚ, xₙ, α, β, γ), ps);
-    # Optimization step
-    Flux.update!(opt, ps, grad)
-    # Logging training
-    acc_ = triplet_accuracy(metric, xₐ, xₚ, xₙ)
-    if mod(iter, 20)==0
-        vbc = (length(val[2]) > 50) ? batch_size : length(val[2])
-        xₐᵥ, xₚᵥ, xₙᵥ = SampleTriplets(val..., vbc, false); # There is sampling too
-        v_loss = triplet_loss(metric, xₐᵥ, xₚᵥ, xₙᵥ, α); # Just approximation -> correlates with choices of xₐᵥ, xₚᵥ, xₙᵥ 
-        v_acc = triplet_accuracy(metric, xₐᵥ, xₚᵥ, xₙᵥ);
-        loss_dict = Dict("Training/Loss"=>loss_, "Training/TripletAccuracy"=>acc_,"Validation/Loss"=>v_loss, "Validation/TripletAccuracy"=>v_acc)
-        if  β !== 0
-            v_reg =  β .* sqrt(sum(x->sqnorm(x,γ), Flux.params(metric)))
-            v_par_norm =  sqrt(sum(x->sqnorm(x,0), Flux.params(metric)))
-            reg_dict = Dict("Validation/Regularization" =>  v_reg, "Validation/ParamNorm"=>v_par_norm)
-            loss_dict = merge(loss_dict, reg_dict)
-        end
-        if Bool(log_pars)
-            par_vec = softplus.(Flux.destructure(metric.inner)[1])'
-            par_vec_dict = Dict("Param/no. $(key)"=>value for (key, value) in enumerate(par_vec))
-            Wandb.log(lg, merge(loss_dict, par_vec_dict),);
-        else
-            Wandb.log(lg, loss_dict,);
-        end
-        push!(history["Training/Loss"], loss_)
-        push!(history["Training/TripletAccuracy"], acc_)
-        push!(history["Validation/Loss"], v_loss)
-        push!(history["Validation/TripletAccuracy"], v_acc)
-    else
-        Wandb.log(lg, Dict("Training/Loss"=>loss_, "Training/TripletAccuracy"=>acc_),);
-        push!(history["Training/Loss"], loss_)
-        push!(history["Training/TripletAccuracy"], acc_)
-    end
-    (isnan(loss_)) ? break : continue 
-end
 
 # log parameters in Table
 θ_names = destructure_metric_to_ws(metric)
