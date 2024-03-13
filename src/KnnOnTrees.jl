@@ -17,6 +17,7 @@ using Zygote
 using Graphs, GraphRecipes
 # GP
 using KernelFunctions
+Flux.@functor KernelFunctions.IndependentMOKernel
 
 #hmill dist
 using HMillDistance
@@ -44,6 +45,7 @@ include("GaussianProcess/gp_batching.jl")
 export BalancedDisjunctBinaryBatches, BalancedDisjunctBatches, MOLabels, chunk
 
 include("GaussianProcess/gp_utils.jl")
+export MO_argmax
 
 include("graph2hmill.jl")
 export graph2hmill, _create_transition_sheet

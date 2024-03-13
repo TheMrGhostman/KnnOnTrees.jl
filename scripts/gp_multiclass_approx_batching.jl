@@ -168,15 +168,6 @@ ŷᵥ = lf.lik.invlink.(mean(fxᵥ))
 fxₜ = f_post(MOInput(test[1], n_classes), 1e-8)
 ŷₜ = lf.lik.invlink.(mean(fxₜ))
 
-
-#TODO make if correctly
-function MO_argmax(y, out_dims)
-    predicted_ = softmax(hcat(chunk(y, out_dims)...), dims=1)
-    max_, argmax_ = findmax(predicted_, dims=1)
-    argmax_ = getindex.(argmax_, 1)
-    return max_[:], argmax_[:]
-end
-
 acc_tr = mean(MO_argmax(ŷₜᵣ, n_classes)[2] .== train[2])
 acc_val = mean(MO_argmax(ŷᵥ, n_classes)[2] .== val[2])
 acc_tst = mean(MO_argmax(ŷₜ, n_classes)[2] .== test[2])

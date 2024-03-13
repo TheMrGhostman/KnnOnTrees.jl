@@ -16,4 +16,9 @@ function AbstractGPs.FiniteGP(f::AbstractGPs.AbstractGP, x::MillType, σ²::Real
 end
 
 
-Flux.@functor KernelFunctions.IndependentMOKernel
+function MO_argmax(y, out_dims)
+    predicted_ = softmax(hcat(chunk(y, out_dims)...), dims=1)
+    max_, argmax_ = findmax(predicted_, dims=1)
+    argmax_ = getindex.(argmax_, 1)
+    return max_[:], argmax_[:]
+end
