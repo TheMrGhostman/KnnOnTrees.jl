@@ -139,12 +139,12 @@ for iter ∈ 1:round(iters/n_obj)
         loss, grads = Zygote.withgradient(θ -> objective(θ), θ_init)
         Flux.Optimise.update!(opt, θ_init, grads[1])
         #logging
-        #Wandb.log(lg, Dict("Training/Loss"=>loss,),);
+        Wandb.log(lg, Dict("Training/Loss"=>loss,),);
         push!(history["Training/Loss"], loss)
         update(pbar)
         obj_loss += loss
     end
-    #Wandb.log(lg, Dict("Training/Loss_sum"=>obj_loss,),);
+    Wandb.log(lg, Dict("Training/Loss_sum"=>obj_loss,),);
 end
 
 # "rename" parameters
@@ -181,10 +181,17 @@ acc_tr = mean(MO_argmax(ŷₜᵣ, n_classes)[2] .== train[2])
 acc_val = mean(MO_argmax(ŷᵥ, n_classes)[2] .== val[2])
 acc_tst = mean(MO_argmax(ŷₜ, n_classes)[2] .== test[2])
 
+acc_tr_MO = mean((ŷₜᵣ .>= 0.5) .== MOLabels(train[2], n_classes))
+acc_val_MO = mean((ŷᵥ .>= 0.5) .== MOLabels(val[2], n_classes))
+acc_tst_MO = mean((ŷₜ  .>= 0.5).== MOLabels(test[2], n_classes))
+
 update_config!(lg, Dict(
     "acc_train" => round(acc_tr, digits=5), 
     "acc_val" => round(acc_val, digits=5),
     "acc_test" => round(acc_tst, digits=5),
+    "acc_train_MO" => round(acc_tr_MO, digits=5), 
+    "acc_val_MO" => round(acc_val_MO, digits=5),
+    "acc_test_MO" => round(acc_tst_MO, digits=5),
     )
 );
 
