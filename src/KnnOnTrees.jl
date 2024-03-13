@@ -15,8 +15,6 @@ using Flux, Distances, StringDistances, OneHotArrays, Base.Threads
 using Zygote
 # graph2hmill
 using Graphs, GraphRecipes
-# GP
-using KernelFunctions
 
 #hmill dist
 using HMillDistance
@@ -31,16 +29,11 @@ export knn, knn_tm, knn_probs, knn_probs_all, knn_predict_multiclass, gram_matri
 include("utils.jl")
 export sample_weights, get_most_occured_class, load_hyperparams
 
-include("TripletLoss/triplet_creation.jl")
+include("triplet_loss.jl")
 export SampleTriplets, OfflineBatchHardTriplets, TripletCreation#, triplet_loss
 
-include("GaussianProcess/kernels.jl")
-export AbstractHMillKernel, LaplacianHMillKernel, Matern32HMillKernel, GaussianHMillKernel, KernelSelector
-
-include("GaussianProcess/gp_batching.jl")
-export BalancedDisjunctBinaryBatches
-
 include("gp_utils.jl")
+export AbstractHMillKernel, LaplacianHMillKernel, Matern32HMillKernel, GaussianHMillKernel, KernelSelector, BalancedDisjunctBinaryBatches
 
 include("graph2hmill.jl")
 export graph2hmill, _create_transition_sheet
