@@ -19,6 +19,9 @@ using Graphs, GraphRecipes
 #hmill dist
 using HMillDistance
 
+#logging
+using Wandb
+
 
 include("dataloading.jl")
 export load_dataset, _to_mill, get_list_of_datasets, preprocess, binary_class_transform

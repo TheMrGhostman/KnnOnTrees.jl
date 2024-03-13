@@ -16,13 +16,10 @@ end
 
 #triplet_loss(model, xₐ, xₚ, xₙ, α=0) = max(mean(model.(xₐ, xₚ) .- model.(xₐ, xₙ) .+ α), 0)
 
+function OfflineBatchHardTriplets(pw_matrix::AbstractMatrix, pw_labels::AbstractMatrix)
+    @assert size(pw_matrix) == size(pw_labels)
 
-function OfflineBatchHardTriplets(model, x, y)
-    # special case for us
-    pw_matrix = pairwise(model, x, x)
-    pw_labels = pairwise(==, y, y)
-    diag_ones = diagm(ones(length(y)))
-
+    diag_ones = diagm(ones(size(pw_labels, 1)))
     #originaly you should backpropagate this all, but we have special case
     _, argmax_hp = findmax(pw_matrix .* (pw_labels .- diag_ones), dims=2) # for symetric matrix is dim=1 and dim=2 the same
     #valid_negatives = pw_matrix .* (1 .- pw_labels)
@@ -30,10 +27,18 @@ function OfflineBatchHardTriplets(model, x, y)
     #_, argmax_hn = findmin(pw_matrix .+ (max_ .* (1 .-(pw_labels .- diag_ones))), dims=2) 
     _, argmax_hn = findmin(pw_matrix .+ (max_ .* pw_labels), dims=2) 
     #return argmax_hp, argmax_hn
-    argmax_hp = map(o->o[2], argmax_hp)
-    argmax_hn = map(o->o[2], argmax_hn)
+    argmax_hp = getindex.(argmax_hp, 2) #map(o->o[2], argmax_hp)
+    argmax_hn = getindex.(argmax_hn, 2) #map(o->o[2], argmax_hn)
     xₐ, xₚ, xₙ = x, x[argmax_hp], x[argmax_hn] 
     return xₐ, xₚ, xₙ
+end
+
+function OfflineBatchHardTriplets(model, x, y)
+    # special case for us
+    # gram_matrix() is multithreaded so is faster then pariwise
+    pw_matrix = gram_matrix(x, x, model; verbose=false); #pairwise(model, x, x)
+    pw_labels = pairwise(==, y, y)
+    return OfflineBatchHardTriplets(pw_matrix, pw_labels)
 end
 
 

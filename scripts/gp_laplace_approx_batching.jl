@@ -1,4 +1,4 @@
-using Revise
+#using Revise
 using ArgParse, DrWatson, BSON, DataFrames, Random, Serialization
 using Flux, Zygote, Mill, Statistics, KnnOnTrees, LinearAlgebra, EvalMetrics
 using Wandb, Dates, Logging, ProgressBars, BenchmarkTools
@@ -61,6 +61,7 @@ parsed_args = parse_args(ARGS, s)
 @unpack dataset, seed, iters, learning_rate, batch_size, kernel, gamma, ui, homogen_depth, bag_metric, card_metric = parsed_args
 #dataset, seed, iters, kernel, gamma, ui = "Mutagenesis", 666, 1, "Laplacian", "nontrainable",1001
 trainable_ = gamma == "trainable";
+@info parsed_args
 
 run_name = "LatentGP-LAB-$(dataset)-seed=$(seed)-kernel=$(kernel)-gamma=$(gamma)-ui=$(ui)"
 # Initialize logger
@@ -86,7 +87,7 @@ global_logger(lg)
 start = time()
 data = load_dataset(dataset; to_mill=true, to_pad_leafs=false, depth=homogen_depth);
 data[2] .= binary_class_transform(data[2], (0,1)); # GP implementation require classes (0,1)
-data = (bag_metric == "WassersteinMultiset") ? (HMillDistance.pad_leaves_for_wasserstein.(data[1]), data[2]) : data; #TODO think about this
+#data = (bag_metric == "WassersteinMultiset") ? (HMillDistance.pad_leaves_for_wasserstein.(data[1]), data[2]) : data; #TODO think about this
 train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, seed=seed, filter_under=10);
 
 # bag_metric and card_metric switch
@@ -121,18 +122,20 @@ opt = ADAM(learning_rate)
 
 # 7) training loop
 history = Dict("Training/Loss"=>[])
-iters = 7*3
 
 pbar = ProgressBar(1:iters);
 for iter ∈ 1:round(iters/n_obj)
+    obj_loss = 0
     for objective ∈ objectives
         loss, grads = Zygote.withgradient(θ -> objective(θ), θ_init)
         Flux.Optimise.update!(opt, θ_init, grads[1])
         #logging
-        Wandb.log(lg, Dict("Training/Loss"=>loss),);
-        update(pbar)
+        Wandb.log(lg, Dict("Training/Loss"=>loss,),);
         push!(history["Training/Loss"], loss)
+        update(pbar)
+        obj_loss += loss
     end
+    Wandb.log(lg, Dict("Training/Loss_sum"=>obj_loss,),);
 end
 
 # "rename" parameters
@@ -140,7 +143,7 @@ end
 #log parse
 parameters = Wandb.Table(data=hcat(string.(θ_names[1]),θ_best), columns=["names", "values"])
 Wandb.log(lg, Dict("parameters_tab"=>parameters,))
-
+println("I am here!!!!!!")
 # 9) build GP
 lf = build_latent_gp(θ_best)
 # 10) merge batches and caches
@@ -177,7 +180,7 @@ update_config!(lg, Dict(
     )
 );
 
-close(lg)
+
 
 id = (seed=seed, ui=ui, kernel=kernel)
 savedir = datadir("GPs", dataset, "$(seed)")
@@ -218,3 +221,5 @@ serialize(joinpath(savedir, "$(run_name).jls"), result)
 et = floor(time()-start)
 @info "Elapsed time: $(et) s"
 println("Results were saved into file $(savedir) --- $(run_name) (.bson / .jls)")
+
+close(lg)

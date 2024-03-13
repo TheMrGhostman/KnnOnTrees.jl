@@ -29,7 +29,7 @@ function load_dataset(name; to_mill::Bool=true, to_pad_leafs::Bool=false, depth:
         to_mill = false # no need to du _to_mill anymore
     end
     X = (to_mill) ? _to_mill(X) : X
-    return X, y
+    return X, Array(y)
 end
 
 

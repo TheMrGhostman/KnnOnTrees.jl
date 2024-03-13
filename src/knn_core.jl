@@ -63,13 +63,21 @@ function knn_predict_multiclass(pdm::Matrix, labels::Union{Vector, SubArray})
     return predicted
 end
 
-function gram_matrix(x₁, x₂, metric; verbose=true)
-    js = (verbose) ? tqdm(1:length(x₂)) : 1:length(x₂)
+function gram_matrix(x₁, x₂, metric; verbose::Bool=true, wandb_progress::Bool=false)
+    lx₂ = length(x₂)
+    js = (verbose) ? tqdm(1:lx₂) : 1:lx₂
     is = 1:length(x₁)
     dist_matrix = zeros(length(x₁), length(x₂))
     for j in js
-        for  i in is
+        Threads.@threads for i in is
             dist_matrix[i, j] = Flux.mean(metric(x₂[j], x₁[i]))
+        end
+        if wandb_progress
+            try
+                Wandb.log(lg, Dict("GramMatrix/Progress"=> round(j/lx₂, 2)*100))
+            catch 
+                @warn "error"
+            end
         end
     end
     return dist_matrix

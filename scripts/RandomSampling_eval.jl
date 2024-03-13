@@ -1,7 +1,8 @@
+#using Revise
 using ArgParse, DrWatson, BSON, DataFrames, Random, Serialization
-using Flux, Zygote, Mill, Statistics, KnnOnTrees, LinearAlgebra
+using Flux, Zygote, Mill, Statistics, LinearAlgebra, Distributions, Base.Threads
 using Wandb, Dates, Logging, ProgressBars
-using HMillDistance, LIBSVM # SVM
+using KnnOnTrees, HMillDistance, LIBSVM
 
 s = ArgParseSettings()
 @add_arg_table! s begin
@@ -35,8 +36,8 @@ end
 
 parsed_args = parse_args(ARGS, s)
 @unpack dataset, seed, ui, homogen_depth, bag_metric, card_metric = parsed_args
-
 @info parsed_args
+@info "Threads -> $(nthreads())"
 
 #bag_metric, card_metric, iters, batch_size, dataset = "WassersteinMultiset", "MaxCard", 1, 2, "hepatitis"
 #batch_size, iters = 2, 1
@@ -45,7 +46,7 @@ run_name = "RS-$(dataset)-seed=$(seed)-ui=$(ui)"
 # Initialize logger
 lg = WandbLogger(project ="TripletLoss",#"Julia-testing",
                  name = run_name,
-                 config = Dict("transformation" => "Softplus",
+                 config = Dict("transformation" => "identity",
                                "dataset" => dataset,
                                "homogen_depth" => homogen_depth,
                                "bag_metric" => bag_metric,
@@ -66,16 +67,15 @@ train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, see
 bag_m = getfield(HMillDistance, Symbol(bag_metric))
 card_m = getfield(HMillDistance, Symbol(card_metric)) 
 # metric
-_metric = reflectmetric(train[1][1]; set_metric=bag_m, card_metric=card_m, weight_sampler=randn, weight_transform=softplus)
-
-Random.seed!(ui) # rondom initialization of weights with fiexed seed
-
+_metric = reflectmetric(train[1][1]; set_metric=bag_m, card_metric=card_m, weight_sampler=randn, weight_transform=identity)
 θ, f = Flux.destructure(_metric)
+distro = MixtureModel([Uniform(0,100), Exponential(log(2)*10)], [0.10, 0.90]) # very heavy tail up to 100
 
+Random.seed!(ui) # random initialization of weights with fiexed seed
+θ_new = rand(distro, size(θ));
+_metric = f(θ_new)
 
 metric = mean ∘ _metric;
-
-
 Random.seed!()
 
 # log parameters in Table
@@ -85,9 +85,9 @@ parameters = Wandb.Table(data=hcat(string.(θ_names[1]), θ_best), columns=["nam
 Wandb.log(lg, Dict("parameters_tab"=>parameters,))
 
 #evaluation SVM and KNN
-gm_tr = Symmetric(gram_matrix(train[1], train[1], metric, verbose=false));
-gm_val = gram_matrix(train[1], val[1], metric, verbose=false);
-gm_tst = gram_matrix(train[1], test[1], metric, verbose=false);
+gm_tr = Symmetric(gram_matrix(train[1], train[1], metric, verbose=true, wandb_progress=true));
+gm_val = gram_matrix(train[1], val[1], metric, verbose=true, wandb_progress=true);
+gm_tst = gram_matrix(train[1], test[1], metric, verbose=true, wandb_progress=true);
 
 rbfkernel(x, γ) = exp.(- abs.(x) ./ γ)
 
@@ -140,18 +140,14 @@ update_config!(lg, Dict("KNN-(k|v|t)" => round.(knn_matrix[argmax_, :], digits=3
 close(lg)
 
 
-id = (seed=seed, ui=ui, reg=reg)
-savedir = datadir("triplet", dataset, "$(seed)") 
+id = (seed=seed, ui=ui)
+savedir = datadir("RandomSampling", dataset, "$(seed)") 
 results = (
     model=metric, 
     metric=_metric, 
     seed=seed, 
-    params=θ_best, 
+    params=θ_new, 
     param_names=θ_names,
-    iters=iters, 
-    learning_rate=learning_rate, 
-    batch_size=batch_size, 
-    history=history, 
     train=train, 
     val=val, 
     test=test, 
