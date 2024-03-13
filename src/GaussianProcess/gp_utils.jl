@@ -15,3 +15,5 @@ function AbstractGPs.FiniteGP(f::AbstractGPs.AbstractGP, x::MillType, σ²::Real
     return FiniteGP(f, x, Fill(σ², length(x)))
 end
 
+
+Flux.@functor KernelFunctions.IndependentMOKernel

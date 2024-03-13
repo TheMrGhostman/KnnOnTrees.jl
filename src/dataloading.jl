@@ -55,6 +55,21 @@ function binary_class_transform(y, new_class_values::Tuple{Number, Number}=(-1,1
     end
 end
 
+function class_transform(y, new_class_values::AbstractArray)
+    orig_class_idx = sort(unique(y))
+    @assert length(orig_class_idx) == length(new_class_values)
+    new_class_idx = sort([new_class_values...])
+    if orig_class_idx == new_class_idx
+        return y
+    else
+        new_y = similar(y)
+        for i in new_class_idx
+            new_y[y .== orig_class_idx[i]] .= new_class_idx[i]
+        end
+        return new_y
+    end
+end
+
 function filter_out_classes_under_n_observations(y::AbstractVector, n::Int)
     cm = countmap(y)
     kv = [(k,cm[k]) for k in keys(cm)]

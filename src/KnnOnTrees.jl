@@ -26,7 +26,7 @@ using Wandb
 
 
 include("dataloading.jl")
-export load_dataset, _to_mill, get_list_of_datasets, preprocess, binary_class_transform
+export load_dataset, _to_mill, get_list_of_datasets, preprocess, binary_class_transform, filter_out_classes_under_n_observations
 
 include("knn_core.jl")
 export knn, knn_tm, knn_probs, knn_probs_all, knn_predict_multiclass, gram_matrix
@@ -41,9 +41,9 @@ include("GaussianProcess/kernels.jl")
 export AbstractHMillKernel, LaplacianHMillKernel, Matern32HMillKernel, GaussianHMillKernel, KernelSelector
 
 include("GaussianProcess/gp_batching.jl")
-export BalancedDisjunctBinaryBatches
+export BalancedDisjunctBinaryBatches, BalancedDisjunctBatches, MOLabels, chunk
 
-include("gp_utils.jl")
+include("GaussianProcess/gp_utils.jl")
 
 include("graph2hmill.jl")
 export graph2hmill, _create_transition_sheet
