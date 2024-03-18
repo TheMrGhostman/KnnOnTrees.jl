@@ -1,8 +1,8 @@
 #using Revise
 using ArgParse, DrWatson, BSON, DataFrames, Random, Serialization
 using Flux, Zygote, Mill, Statistics, LinearAlgebra, Distributions, Base.Threads
-using Wandb, Dates, Logging, ProgressBars
-using KnnOnTrees, HMillDistance, LIBSVM
+using Wandb, Dates, Logging, ProgressBars, StatsBase
+using KnnOnTrees, HMillDistance, LIBSVM, EvalMetrics
 
 s = ArgParseSettings()
 @add_arg_table! s begin
@@ -42,9 +42,9 @@ parsed_args = parse_args(ARGS, s)
 #bag_metric, card_metric, iters, batch_size, dataset = "WassersteinMultiset", "MaxCard", 1, 2, "hepatitis"
 #batch_size, iters = 2, 1
 
-run_name = "RS-$(dataset)-seed=$(seed)-ui=$(ui)"
+run_name = "RS-AD-$(dataset)-seed=$(seed)-ui=$(ui)"
 # Initialize logger
-lg = WandbLogger(project ="TripletLoss",#"Julia-testing",
+lg = WandbLogger(project ="KnnOnTrees - Anomaly Detection",
                  name = run_name,
                  config = Dict("transformation" => "identity",
                                "dataset" => dataset,
@@ -60,7 +60,20 @@ global_logger(lg)
 start = time()
 data = load_dataset(dataset; to_mill=true, to_pad_leafs=false, depth=homogen_depth);
 data = (bag_metric == "WassersteinMultiset") ? (HMillDistance.pad_leaves_for_wasserstein.(data[1]), data[2]) : data;
-train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, seed=seed, filter_under=10);
+
+# separate normal class 
+class_freq = countmap(data[2])
+most_frequent_class = sort(collect(class_freq), rev=true,by=x->getindex(x, 2))[1][1]
+
+normal_data = data[1][data[2] .== most_frequent_class]; # class is imaginary 0
+anomalous_data = data[1][data[2] .!= most_frequent_class]; # every other class is anomalous (leave-one-in procedure)
+
+train_n, val_n, test_n = preprocess(normal_data, zeros(length(normal_data)); ratios=(0.6,0.2,0.2), procedure=:clf, seed=seed, filter_under=10);
+_, val_a, test_a = preprocess(anomalous_data, ones(length(anomalous_data)); ratios=(0.0,0.5,0.5), procedure=:clf, seed=seed, filter_under=10);
+
+train = train_n;
+val = map((a,b)->vcat(a,b), val_n, val_a);
+test = map((a,b)->vcat(a,b), test_n, test_a);
 
 
 # bag_metric and card_metric switch
@@ -84,64 +97,38 @@ Random.seed!()
 parameters = Wandb.Table(data=hcat(string.(θ_names[1]), θ_best), columns=["names", "values"])
 Wandb.log(lg, Dict("parameters_tab"=>parameters,))
 
-#evaluation SVM and KNN
-gm_tr = Symmetric(gram_matrix(train[1], train[1], metric, verbose=true, wandb_progress=true));
-gm_val = gram_matrix(train[1], val[1], metric, verbose=true, wandb_progress=true);
-gm_tst = gram_matrix(train[1], test[1], metric, verbose=true, wandb_progress=true);
+#Computing Gram Matrix
+#gm_tr = Symmetric(gram_matrix(train[1], train[1], metric, verbose=true));
+gm_val = gram_matrix(train[1], val[1], metric, verbose=true);
+gm_tst = gram_matrix(train[1], test[1], metric, verbose=true);
 
-rbfkernel(x, γ) = exp.(- abs.(x) ./ γ)
+sgm_val = sort(gm_val, dims=1);
+sgm_tst = sort(gm_tst, dims=1);
 
-
-res = []
-for γ ∈ tqdm(0.1:0.1:20) # 0.01
-    model = svmtrain(rbfkernel(gm_tr, γ), train[2]; kernel=LIBSVM.Kernel.Precomputed, verbose=false);
-
-    y_train_pr, _ = svmpredict(model, rbfkernel(gm_tr, γ));
-    y_valid_pr, _ = svmpredict(model, rbfkernel(gm_val, γ));
-    y_test_pr, _ = svmpredict(model, rbfkernel(gm_tst, γ));
-
-    train_a = mean(y_train_pr .== train[2])
-    valid_a = mean(y_valid_pr .== val[2])
-    test_a = mean(y_test_pr .== test[2])
-
-    push!(res, [γ, train_a, valid_a, test_a])
-end
+# compute AUC for evary k
+auc_val = mapslices(col->auc_trapezoidal(prcurve(val[2], col)...), sgm_val, dims=2)[:];
+auc_test = mapslices(col->auc_trapezoidal(prcurve(test[2], col)...), sgm_tst, dims=2)[:];
 
 ## logging
-svm_matrix = permutedims(hcat(res...), (2,1))
-svm_columns = ["γ", "train_acc", "valid_acc", "test_acc"]
-SVM_results = Wandb.Table(data=svm_matrix, columns=svm_columns)
-accs_plot = Wandb.plot_line_series(svm_matrix[:,1], transpose(svm_matrix[:,2:end]), ["train", "valid", "test"], "Accuracy", "γ")
-_,argmax_ = findmax(svm_matrix[:,end])
-
-Wandb.log(lg, Dict("SVM_plot"=>accs_plot, "SVM_tab"=>SVM_results))
-update_config!(lg, Dict("SVM-(γ|t|v|t)" => round.(svm_matrix[argmax_, :], digits=3), "SVM-max"=>round(svm_matrix[argmax_, end], digits=4)))
-
-
-# KNN
-val_probs = knn_predict_multiclass(gm_val, train[2]);
-tst_probs = knn_predict_multiclass(gm_tst, train[2]);
-
-tr_len = length(train[2]);
-accuracy_val = mean(val_probs .== repeat(val[2], 1, tr_len)', dims=2)[:];
-accuracy_tst = mean(tst_probs .== repeat(test[2], 1, tr_len)', dims=2)[:];
-
-## logging
-knn_matrix = hcat(1:tr_len, accuracy_val, accuracy_tst)
-knn_columns=["k", "valid_acc", "test_acc"]
-accs_plot2 = Wandb.plot_line_series(collect(1:tr_len), hcat(accuracy_val, accuracy_tst)', ["valid", "test"], "Accuracy", "k")
+tr_len = length(train[2])
+knn_matrix = hcat(1:tr_len, auc_val, auc_test)
+knn_columns=["k", "valid_auc", "test_auc"]
+accs_plot2 = Wandb.plot_line_series(collect(1:tr_len), hcat(auc_val, auc_test)', ["valid", "test"], "AUC", "k")
 KNN_results = Wandb.Table(data=knn_matrix, columns=knn_columns)
-_,argmax_ = findmax(knn_matrix[:,end])
-
 Wandb.log(lg, Dict("KNN_plot"=>accs_plot2, "KNN_tab"=>KNN_results))
-update_config!(lg, Dict("KNN-(k|v|t)" => round.(knn_matrix[argmax_, :], digits=3), "KNN-max"=>round(knn_matrix[argmax_, end], digits=4)))
 
-# Finish the run (Logger)
-close(lg)
+
+_, idx_val = findmax(auc_val)
+_, idx_tst = findmax(auc_test)
+
+update_config!(lg, Dict(
+    "KNN_v-(k|v|t)" => round.(knn_matrix[idx_val, :], digits=3), 
+    "KNN_t-(k|v|t)" => round.(knn_matrix[idx_tst, :], digits=3) ,
+    "KNN-max"=>round(knn_matrix[idx_tst, end], digits=4)))
 
 
 id = (seed=seed, ui=ui)
-savedir = datadir("RandomSampling", dataset, "$(seed)") 
+savedir = datadir("RandomSampling-AD", dataset, "$(seed)") 
 results = (
     model=metric, 
     metric=_metric, 
@@ -152,12 +139,10 @@ results = (
     val=val, 
     test=test, 
     ui=id[:ui], 
-    svm_res = DataFrame(svm_matrix, svm_columns),
     knn_res = DataFrame(knn_matrix, knn_columns),
     homogen_depth = homogen_depth,
     bag_metric=bag_metric,
     card_metric=card_metric,
-    gm_train = gm_tr,
     gm_val = gm_val,
     gm_test = gm_tst,
 )
@@ -172,3 +157,7 @@ tagsave(joinpath(savedir, "$(run_name).bson"), result, safe = true);
 et = floor(time()-start)
 @info "Elapsed time: $(et) s"
 println("Results were saved into file $(savedir) --- $(run_name) (.bson / .jls)")
+
+
+# Finish the run (Logger)
+close(lg)
