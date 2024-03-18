@@ -38,12 +38,23 @@ s = ArgParseSettings()
         arg_type = Int
         help = "unique identifier"
         default = Int(rand(1:1e8)) # test for error
+    "bag_metric"
+        arg_type = String
+        help = "Which type of metric to use for comparision of bags \\
+                 options: (\"ChamferDistance\", \"WassersteinProbDist\", \"WassersteinMultiset\", \"Hausdorff\" )"
+        default="ChamferDistance"
+    "card_metric"
+        arg_type = String
+        help = "Which type of metric/transfromation to use for cardinality \\
+                options: (\"ScaleOne\", \"MaxCard\")"
+        default = "ScaleOne" 
 end
 
 parsed_args = parse_args(ARGS, s)
-@unpack dataset, seed, iters, kernel, gamma, ui = parsed_args
+@unpack dataset, seed, iters, kernel, gamma, ui, bag_metric, card_metric = parsed_args
 #dataset, seed, iters, kernel, gamma, ui = "chess", 666, 1, "Laplacian", "nontrainable",1001
 trainable_ = gamma == "trainable";
+@info parsed_args
 
 run_name = "LatentGP-LA-$(dataset)-seed=$(seed)-kernel=$(kernel)-gamma=$(gamma)--ui=$(ui)"
 # Initialize logger
@@ -55,6 +66,8 @@ lg = WandbLogger(project ="TripletLoss",
                                "initialization" => "0.54 ⋅ ones",
                                "gamma" => gamma,
                                "dataset" => dataset,
+                               "bag_metric" => bag_metric,
+                               "card_metric" => card_metric,
                                "iters" => iters,
                                "seed" => seed,
                                "ui" => ui))
@@ -65,10 +78,13 @@ global_logger(lg)
 
 start = time()
 data = load_dataset(dataset; to_mill=true);
-train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, seed=seed, filter_under=10);
+train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, seed=seed, filter_under=20);
 
 unique_classes = sort(unique(train[2]))
 training_history = Dict()
+
+bag_m = getfield(HMillDistance, Symbol(bag_metric))
+card_m = getfield(HMillDistance, Symbol(card_metric)) 
 
 for class ∈ tqdm(unique_classes)
     # 0) transform classes
@@ -77,7 +93,7 @@ for class ∈ tqdm(unique_classes)
     y_test = float.(test[2] .== class)
 
     # 1) define metrics
-    metric = reflectmetric(data[1][1], weight_sampler=x->0.54.*ones(x), weight_transform=softplus)
+    metric = reflectmetric(data[1][1], set_metric=bag_m, card_metric=card_m, weight_sampler=x->0.54.*ones(x), weight_transform=softplus)
     # 2) specify kernel
     KernelConstructor_ = KernelSelector(kernel; trainable=trainable_) #LaplacianHMillKernel # TODO add more options | Laplacian is the first
     Kernel = KernelConstructor_(metric)#; γ=1.0, trainable=trainable_)
@@ -175,10 +191,9 @@ update_config!(lg, Dict(
     )
 );
 
-close(lg)
 
 id = (seed=seed, ui=ui, kernel=kernel)
-savef = joinpath(datadir("GPs", dataset, "$(seed)"), "$(run_name).bson");
+savedir = datadir("GPs", dataset, "$(seed)")
 results = (
     # basic log
     kernel_type=kernel,
@@ -194,11 +209,17 @@ results = (
     accuracy = (train=acc_tr, valid=acc_val, test=acc_tst),
 )
 
-result = Dict{Symbol, Any}([Symbol(sym)=>val for (sym,val) in pairs(results)]); # this has to be a Dict 
-result = merge(training_history, result);
-tagsave(savef, result, safe = true);
-@info "Results were saved into file $(savef)"
+result = Dict{Symbol, Any}([sym=>val for (sym,val) in pairs(results)]); # this has to be a Dict 
+if !ispath(savedir)
+    mkpath(savedir)
+end
+serialize(joinpath(savedir, "$(run_name).jls"), result) 
+tagsave(joinpath(savedir, "$(run_name).bson"), result, safe = true);
+@info "Results were saved into file $(savedir) --- $(run_name) (.bson / .jls)"
 et = floor(time()-start)
 @info "Elapsed time: $(et) s"
+println("Results were saved into file $(savedir) --- $(run_name) (.bson / .jls)")
+
+close(lg)
 
 

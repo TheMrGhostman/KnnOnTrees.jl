@@ -193,7 +193,7 @@ results = (
     # basic log
     model=lf, # LatentGP
     kernel=m_st(θ_best), 
-    metric=m_st(θ_best).d,
+    metric=m_st(θ_best).kernel.d,
     seed=seed, 
     params=θ_best, 
     iters=iters, 
