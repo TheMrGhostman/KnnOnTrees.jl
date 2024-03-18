@@ -31,7 +31,7 @@ function BalancedDisjunctBatches(labels, batch_size, n_classes; seed=Int(rand(1:
     common_denominator = minimum(getindex.(size.(cls0), 1))
     batches = [vcat([cls0[j][i] for j ∈ 1:n_classes]...) for i ∈ 1:common_denominator]
     classes = [vcat([j .* ones(size(cls0[j][i])) for j ∈ 1:n_classes]...) for i ∈ 1:common_denominator]
-    return classes, classes
+    return batches, classes
 end
 
 chunk(arr, n) = [arr[i:min(i + n - 1, end)] for i in 1:n:length(arr)]

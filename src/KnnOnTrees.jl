@@ -27,7 +27,8 @@ using Wandb
 
 
 include("dataloading.jl")
-export load_dataset, _to_mill, get_list_of_datasets, preprocess, binary_class_transform, filter_out_classes_under_n_observations
+export load_dataset, _to_mill, get_list_of_datasets, preprocess, binary_class_transform, class_transform
+export filter_out_classes_under_n_observations
 
 include("knn_core.jl")
 export knn, knn_tm, knn_probs, knn_probs_all, knn_predict_multiclass, gram_matrix
