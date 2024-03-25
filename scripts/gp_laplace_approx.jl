@@ -83,7 +83,7 @@ global_logger(lg)
 start = time()
 data = load_dataset(dataset; to_mill=true, depth=homogen_depth);
 data[2] .= binary_class_transform(data[2], (0,1)); # GP implementation require classes (0,1)
-data = (bag_metric == "WassersteinMultiset") ? (HMillDistance.pad_leaves_for_wasserstein.(data[1]), data[2]) : data;
+#data = (bag_metric == "WassersteinMultiset") ? (HMillDistance.pad_leaves_for_wasserstein.(data[1]), data[2]) : data;
 train, val, test = preprocess(data...; ratios=(0.6,0.2,0.2), procedure=:clf, seed=seed, filter_under=0);
 
 
