@@ -125,6 +125,7 @@ opt = ADAM(learning_rate)
 # 7) training loop
 history = Dict("Training/Loss"=>[], "params_stats"=>[])
 
+sqnorm(x,b=0) = sum(y->abs2(y .- b), x)
 param_statistics(θ) = Dict(
     "minimum" => minimum(θ), 
     "q_25" => quantile(θ, 0.25), 
@@ -136,7 +137,7 @@ param_statistics(θ) = Dict(
 for iter ∈ tqdm(1:iters)
     loss_, grads = Zygote.withgradient(θ -> loss(θ, train[1]), θ_init)
     Flux.Optimise.update!(opt, θ_init, grads[1])
-    stats = param_statistics(θ_init)
+    stats = param_statistics(softplus.(θ_init))
     Wandb.log(lg, merge(Dict("Training/Loss"=>loss_,), stats));
     push!(history["Training/Loss"], loss_)
     push!(history["params_stats"], stats)
@@ -148,40 +149,30 @@ end
 parameters = Wandb.Table(data=hcat(string.(θ_names[1]),θ_best), columns=["names", "values"])
 Wandb.log(lg, Dict("parameters_tab"=>parameters,))
 
-"""
-# threaded gram matrix is much faster then calling GP
-train_ = (bag_metric == "WassersteinMultiset") ? (HMillDistance.pad_leaves_for_wasserstein.(train[1]), train[2]) : train;
-val_ = (bag_metric == "WassersteinMultiset") ? (HMillDistance.pad_leaves_for_wasserstein.(val[1]), val[2]) : val;
-test_ = (bag_metric == "WassersteinMultiset") ? (HMillDistance.pad_leaves_for_wasserstein.(test[1]), test[2]) : test;
-
-gm_tt = gram_matrix(train_[1], train_[1], m_st(θ_best), verbose=true);
-gm_tv = gram_matrix(train_[1], val_[1], m_st(θ_best), verbose=true);
-gm_tts = gram_matrix(train_[1], test_[1], m_st(θ_best), verbose=true);
-
-gm_vv = gram_matrix(val_[1], val_[1], m_st(θ_best), verbose=true);
-gm_tsts = gram_matrix(test_[1], test_[1], m_st(θ_best), verbose=true);
-
-C = inv(gm_tt);
-"""
 # build gp
 fx = build_gp(θ_best)(train[1])
 # compute posterior
 f_post = posterior(fx, ones(size(train[2])))
 # compute marginals
-marg_val = marginals(f_post(val[1]))
-marg_test = marginals(f_post(test[1]))
+μ_v, σ²_v = mean_and_var(f_post(val[1]))
+μ_t, σ²_t = mean_and_var(f_post(test[1]))
+
+
+#marg_val = marginals(f_post(val[1]))
+#marg_test = marginals(f_post(test[1]))
 # marginals for val data
-μ_v = getproperty.(marg_val, :μ)
-σ_v = getproperty.(marg_val, :σ)
+#μ_v = getproperty.(marg_val, :μ)
+#σ_v = getproperty.(marg_val, :σ)
 # marginals for test data
-μ_t = getproperty.(marg_test, :μ)
-σ_t = getproperty.(marg_test, :σ)
+#μ_t = getproperty.(marg_test, :μ)
+#σ_t = getproperty.(marg_test, :σ)
 
 𝓔_v = - μ_v
 𝓔_t = - μ_t
 
-𝓥_v = σ_v.^2 # original formula is -σ^2 but for 1 normal, 0 anomal -> we have 0 normal, 1 anomal
-𝓥_t = σ_t.^2
+𝓥_v = - σ²_v#σ_v.^2 # original formula is -σ^2 but for 1 normal, 0 anomal -> we have 0 normal, 1 anomal
+𝓥_t = - σ²_t#σ_t.^2
+
 
 # compute AUCs
 # score with μ
@@ -191,11 +182,11 @@ auc_𝓔_test = auc_trapezoidal(prcurve(test[2], 𝓔_t)...)
 auc_𝓥_val = auc_trapezoidal(prcurve(val[2], 𝓥_v)...)
 auc_𝓥_test = auc_trapezoidal(prcurve(test[2], 𝓥_t)...)
 # score with σ
-auc_σ_val = auc_trapezoidal(prcurve(val[2], σ_v)...)
-auc_σ_test = auc_trapezoidal(prcurve(test[2], σ_t)...)
+auc_σ_val = auc_trapezoidal(prcurve(val[2], σ²_v)...)
+auc_σ_test = auc_trapezoidal(prcurve(test[2], σ²_t)...)
 
 
-update_config!(lg, Dict(
+Wandb.log(lg, Dict(
     "auc_𝓔_val" => round(auc_𝓔_val, digits=3), 
     "auc_𝓔_test" => round(auc_𝓔_test, digits=3),
     "auc_𝓥_val" => round(auc_𝓥_val, digits=3), 
@@ -228,8 +219,8 @@ results = (
     y_𝓔_test = 𝓔_t,
     y_𝓥_valid = 𝓥_v,
     y_𝓥_test = 𝓥_t,
-    y_σ_valid = σ_v,
-    y_σ_test = σ_t,
+    y_σ_valid = σ²_v,
+    y_σ_test = σ²_t,
     # metrics
     auc_𝓔 = (valid=auc_𝓔_val, test=auc_𝓔_test),
     auc_𝓥 = (valid=auc_𝓥_val, test=auc_𝓥_test),
